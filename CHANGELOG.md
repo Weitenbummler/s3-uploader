@@ -8,6 +8,7 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen 
 ### Geändert
 - README: eigene Installationsbefehle für Windows-PowerShell (`py`, `Activate.ps1`,
   Ausführungsrichtlinie, Aufruf ohne Aktivierung) und PowerShell-Entsprechungen der Beispiele.
+- README: Windows-Pfade mit `.\` davor, sonst deutet PowerShell `.venv\…` als Modulnamen.
 
 ## [0.2.0] – 2026-11-19
 

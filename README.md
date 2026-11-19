@@ -73,6 +73,10 @@ py -m venv .venv
 python -m pip install --upgrade pip
 ```
 
+Wichtig in PowerShell: Pfade zu Programmen im aktuellen Verzeichnis beginnen mit `.\`.
+Ohne diesen Vorsatz liest PowerShell `.venv\…` als „Modul .venv, Befehl …“ und meldet
+„Das Modul „.venv“ konnte nicht geladen werden“.
+
 Nach der Aktivierung steht `(.venv)` vor der Eingabeaufforderung; ab dann gilt `python`
 bzw. `pip` für die virtuelle Umgebung, auf allen Systemen gleich.
 
