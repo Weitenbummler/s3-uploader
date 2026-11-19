@@ -3,6 +3,17 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.3.1] – 2026-11-19
+
+### Hinzugefügt
+- `--ca-zertifikat` prüft die Datei beim Start und nennt die Abhilfe für binäre (DER),
+  doppelt kodierte (`[X509] PEM lib`), als UTF-16 gespeicherte, beschädigte Dateien und
+  Dateien ohne Zertifikat.
+- README W12, M12, L12: Form der Datei prüfen und nur binäre Dateien umwandeln.
+
+### Geändert
+- Verbindungstest: verständlicher Hinweis bei unlesbarer Zertifikatsdatei.
+
 ## [0.3.0] – 2026-11-19
 
 ### Hinzugefügt

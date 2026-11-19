@@ -336,6 +336,12 @@ auch einen Zertifikatsfehler, der beim zehnten Versuch genauso auftritt. Der
 Verbindungstest nutzt daher `max_versuche=2`, und `hochladen` prüft die Verbindung vorab,
 statt jede Datei einzeln scheitern zu lassen.
 
+Dritte Lehre: **Eingaben früh und verständlich prüfen.** Eine Zertifikatsdatei kann binär
+(DER), doppelt kodiert oder als UTF-16 gespeichert sein – OpenSSL meldet das nur knapp als
+`[X509] PEM lib`. `pruefe_ca_datei` in `konfiguration.py` erkennt diese Fälle beim Start:
+Binäres DER beginnt mit dem Byte `0x30`, UTF-16 mit einer Bytefolge `FF FE`, und bei doppelter
+Kodierung ergibt das Entschlüsseln des Blocks wieder `-----BEGIN`.
+
 > **Übung 7a:** Warum wäre es gefährlich, das Zertifikat einfach vom Server selbst
 > herunterzuladen und mit `--ca-zertifikat` anzugeben? (Lösung: Ein Angreifer in der
 > Mitte würde dir sein eigenes Zertifikat liefern – du würdest ihm damit vertrauen. Den

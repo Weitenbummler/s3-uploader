@@ -40,11 +40,11 @@ Alles danach ([Parameter](#parameter-und-umgebungsvariablen), [Optionen](#option
 
 Gemeinsame Voraussetzung: **Python 3.11 oder neuer** und Netzwerkzugang zum S3-Endpunkt.
 
-**Getestet unter** (Version 0.3.0):
+**Getestet unter** (Version 0.3.1):
 
 | System | Python | Kommandozeile | Geprüft |
 |---|---|---|---|
-| Windows 11 (Build 26300) | 3.15.2 | PowerShell 5.1 | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, eigene Zertifizierungsstelle (`--ca-zertifikat`, `S3_CA_ZERTIFIKAT`), PEM-Export aus dem Windows-Zertifikatspeicher, Umlaute und Leerzeichen in Pfaden |
+| Windows 11 (Build 26300) | 3.15.2 | PowerShell 5.1 | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, eigene Zertifizierungsstelle (`--ca-zertifikat`, `S3_CA_ZERTIFIKAT`), PEM-Export aus dem Windows-Zertifikatspeicher, Erkennung binärer, doppelt kodierter und UTF-16-Zertifikatsdateien samt Abhilfe, Umlaute und Leerzeichen in Pfaden |
 | macOS 27.2.1 | 3.11 | zsh | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, eigene Zertifizierungsstelle (`--ca-zertifikat`, `S3_CA_ZERTIFIKAT`, `AWS_CA_BUNDLE`), PEM-Export aus dem Schlüsselbund |
 | Linux | – | – | **noch nicht geprüft** (nur statische Typprüfung für Linux) |
 
@@ -302,7 +302,22 @@ $c = Get-ChildItem Cert:\CurrentUser\Root, Cert:\LocalMachine\Root | Where-Objec
 "-----BEGIN CERTIFICATE-----`n" + [Convert]::ToBase64String($c.RawData, "InsertLineBreaks") + "`n-----END CERTIFICATE-----" | Set-Content D:\Zertifikate\firma-ca.pem -Encoding ascii
 ```
 
-2. **Angeben** – als Parameter oder für das ganze Fenster:
+2. **Form prüfen.** Die Endung (`.crt`, `.cer`, `.pem`) sagt nichts. Entscheidend ist die
+   erste Zeile:
+
+```powershell
+Get-Content D:\Zertifikate\firma.crt -TotalCount 1
+```
+
+   - Steht dort `-----BEGIN CERTIFICATE-----`, ist die Datei schon richtig – **nicht
+     umwandeln**, direkt in Schritt 3 angeben.
+   - Erscheinen unleserliche Zeichen, ist sie binär (DER). Einmal umwandeln:
+
+```powershell
+certutil -encode D:\Zertifikate\firma.crt D:\Zertifikate\firma-ca.pem
+```
+
+3. **Angeben** – als Parameter oder für das ganze Fenster:
 
 ```powershell
 s3-uploader test … --ca-zertifikat D:\Zertifikate\firma-ca.pem
@@ -312,7 +327,16 @@ s3-uploader test … --ca-zertifikat D:\Zertifikate\firma-ca.pem
 $env:S3_CA_ZERTIFIKAT = 'D:\Zertifikate\firma-ca.pem'
 ```
 
-Hinweise: Das binäre Format „DER-codiert“ funktioniert nicht, nur Base-64/PEM. Gibt es eine
+s3-uploader prüft die Datei beim Start und nennt die Abhilfe:
+
+| Meldung | Ursache | Abhilfe |
+|---|---|---|
+| „… im binären Format (DER) …“ | Datei ist binär | `certutil -encode` wie in Schritt 2 |
+| „… doppelt kodiert …“ (früher: `[X509] PEM lib`) | Datei war schon Text und wurde trotzdem mit `certutil -encode` umgewandelt | die ursprüngliche `.crt` direkt angeben |
+| „… als UTF-16 gespeichert …“ | mit `>` oder `Out-File` gespeichert | wie in der Meldung angegeben mit `Set-Content … -Encoding ascii` neu speichern |
+| „… enthält kein Zertifikat …“ | z. B. nur ein privater Schlüssel | Zertifikat der Zertifizierungsstelle beim Betreiber anfordern |
+
+Gibt es eine
 Zwischenzertifizierungsstelle, beide Zertifikate in eine Datei untereinander kopieren. Ein
 Zertifikat nicht einfach vom Server selbst übernehmen, ohne den Fingerabdruck mit dem
 Betreiber abzugleichen – sonst prüft die Verschlüsselung nichts mehr.
@@ -496,7 +520,22 @@ macOS-Schlüsselbund nicht – auch wenn Safari die Seite akzeptiert.
 security find-certificate -c "Firma" -p /Library/Keychains/System.keychain > ~/firma-ca.pem
 ```
 
-2. **Angeben** – als Parameter oder für das ganze Fenster:
+2. **Form prüfen.** Die Endung (`.crt`, `.cer`, `.pem`) sagt nichts. Entscheidend ist die
+   erste Zeile:
+
+```bash
+head -1 ~/firma.crt
+```
+
+   - Steht dort `-----BEGIN CERTIFICATE-----`, ist die Datei schon richtig – **nicht
+     umwandeln**, direkt in Schritt 3 angeben.
+   - Erscheinen unleserliche Zeichen, ist sie binär (DER). Einmal umwandeln:
+
+```bash
+openssl x509 -inform der -in ~/firma.crt -out ~/firma-ca.pem
+```
+
+3. **Angeben** – als Parameter oder für das ganze Fenster:
 
 ```bash
 s3-uploader test … --ca-zertifikat ~/firma-ca.pem
@@ -506,9 +545,10 @@ s3-uploader test … --ca-zertifikat ~/firma-ca.pem
 export S3_CA_ZERTIFIKAT=~/firma-ca.pem
 ```
 
-Hinweise: Gibt es eine Zwischenzertifizierungsstelle, beide Zertifikate in eine Datei
-untereinander kopieren. Ein Zertifikat nicht einfach vom Server selbst übernehmen, ohne den
-Fingerabdruck mit dem Betreiber abzugleichen.
+s3-uploader prüft die Datei beim Start und nennt bei binären, doppelt kodierten oder
+beschädigten Dateien die Abhilfe. Gibt es eine Zwischenzertifizierungsstelle, beide
+Zertifikate in eine Datei untereinander kopieren. Ein Zertifikat nicht einfach vom Server
+selbst übernehmen, ohne den Fingerabdruck mit dem Betreiber abzugleichen.
 
 ---
 
@@ -669,7 +709,22 @@ s3-uploader das Zertifikat dieser Zertifizierungsstelle als Datei.
 1. **Datei besorgen** – vom Betreiber des Speichers, im PEM-Format (Textdatei, beginnt mit
    `-----BEGIN CERTIFICATE-----`).
 
-2. **Angeben** – als Parameter oder für die ganze Sitzung:
+2. **Form prüfen.** Die Endung (`.crt`, `.cer`, `.pem`) sagt nichts. Entscheidend ist die
+   erste Zeile:
+
+```bash
+head -1 firma.crt
+```
+
+   - Steht dort `-----BEGIN CERTIFICATE-----`, ist die Datei schon richtig – **nicht
+     umwandeln**, direkt in Schritt 3 angeben.
+   - Erscheinen unleserliche Zeichen, ist sie binär (DER). Einmal umwandeln:
+
+```bash
+openssl x509 -inform der -in firma.crt -out firma-ca.pem
+```
+
+3. **Angeben** – als Parameter oder für die ganze Sitzung:
 
 ```bash
 s3-uploader test … --ca-zertifikat /etc/s3-uploader/firma-ca.pem
@@ -687,8 +742,9 @@ Debian/Ubuntu Datei mit Endung `.crt` nach `/usr/local/share/ca-certificates/` k
 `sudo update-ca-certificates`; Fedora/RHEL nach `/etc/pki/ca-trust/source/anchors/` und
 `sudo update-ca-trust`.
 
-Ein Zertifikat nicht einfach vom Server selbst übernehmen, ohne den Fingerabdruck mit dem
-Betreiber abzugleichen.
+s3-uploader prüft die Datei beim Start und nennt bei binären, doppelt kodierten oder
+beschädigten Dateien die Abhilfe. Ein Zertifikat nicht einfach vom Server selbst übernehmen,
+ohne den Fingerabdruck mit dem Betreiber abzugleichen.
 
 ---
 
