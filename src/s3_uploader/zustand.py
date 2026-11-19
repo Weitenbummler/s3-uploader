@@ -184,6 +184,25 @@ class Zustand:
             ).fetchone()
         return None if zeile is None else str(zeile[0])
 
+    def offener_upload(self, schluessel: str) -> str | None:
+        """Liefert die Upload-ID eines begonnenen Multipart-Uploads, unabhängig vom Dateistand.
+
+        Wird gebraucht, wenn ein Lauf mit Teilung begonnen und ohne Teilung fortgesetzt wird:
+        Der alte Multipart-Upload muss dann abgebrochen werden.
+
+        Args:
+            schluessel: Objektschlüssel.
+
+        Returns:
+            Upload-ID oder ``None``.
+        """
+        with self._sperre:
+            zeile = self._db.execute(
+                "SELECT upload_id FROM dateien WHERE schluessel = ? AND upload_id IS NOT NULL",
+                (schluessel,),
+            ).fetchone()
+        return None if zeile is None else str(zeile[0])
+
     def anzahl_erledigt(self) -> int:
         """Zählt die als erledigt gespeicherten Dateien.
 

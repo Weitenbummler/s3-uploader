@@ -80,3 +80,28 @@ def test_ungueltige_groesse(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as fehler:
         main(["hochladen", "--quelle", ".", "--schwelle", "riesig"])
     assert fehler.value.code == EXIT_BEDIENUNG
+
+
+def test_ohne_teilung_per_parameter(
+    s3: Any, quelle: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(
+            [
+                "hochladen",
+                *_basis(tmp_path),
+                "--quelle",
+                str(quelle),
+                "--ohne-teilung",
+                "--zustand",
+                str(tmp_path / "z.sqlite"),
+                "--schwelle",
+                "5MiB",
+                "--still",
+            ]
+        )
+        == EXIT_OK
+    )
+    fehler = capsys.readouterr().err
+    assert "0 in Teilen" in fehler and "Teilung abgeschaltet" in fehler
+    assert lies_objekt(s3, "cli/gross.bin") == (quelle / "gross.bin").read_bytes()

@@ -68,6 +68,9 @@ class UploadEinstellungen:
         teilgroesse: Gewünschte Teilgröße für Multipart in Bytes (wird bei Bedarf vergrößert).
         parallel_dateien: Anzahl gleichzeitig bearbeiteter Dateien.
         parallel_teile: Anzahl gleichzeitig hochgeladener Teile je Multipart-Datei.
+        teilung: Ob große Dateien in Teilen (Multipart) hochgeladen werden. Ohne Teilung
+            geht jede Datei als ein ``PutObject``; dann gilt die S3-Grenze von 5 GiB je Datei
+            und ein abgebrochener Upload einer Datei beginnt beim Fortsetzen von vorn.
         pruefe_ziel: Vor dem Upload prüfen, ob das Objekt mit gleicher Größe schon existiert.
         ausschluesse: Glob-Muster relativer Pfade, die nicht hochgeladen werden.
     """
@@ -79,6 +82,7 @@ class UploadEinstellungen:
     teilgroesse: int = 16 * 1024**2
     parallel_dateien: int = 4
     parallel_teile: int = 4
+    teilung: bool = True
     pruefe_ziel: bool = False
     ausschluesse: tuple[str, ...] = ()
 

@@ -134,6 +134,12 @@ def erzeuge_parser() -> argparse.ArgumentParser:
     )
     hoch.add_argument("--quelle", type=Path, required=True, help="Quellverzeichnis")
     hoch.add_argument(
+        "--ohne-teilung",
+        action="store_true",
+        help="Große Dateien nicht in Teile zerlegen: jede Datei als ein PUT (höchstens 5 GiB "
+        "je Datei, Abbruch einer Datei bedeutet Neubeginn dieser Datei)",
+    )
+    hoch.add_argument(
         "--schwelle",
         type=parse_groesse,
         default="64MiB",
@@ -268,6 +274,7 @@ def befehl_hochladen(args: argparse.Namespace) -> int:
         teilgroesse=args.teilgroesse,
         parallel_dateien=args.parallel_dateien,
         parallel_teile=args.parallel_teile,
+        teilung=not args.ohne_teilung,
         pruefe_ziel=args.pruefe_ziel,
         ausschluesse=tuple(args.ausschliessen),
     )
@@ -293,6 +300,14 @@ def befehl_hochladen(args: argparse.Namespace) -> int:
             f"{plan.multipart} in Teilen ({formatiere_bytes(plan.bytes_offen)}).",
             file=sys.stderr,
         )
+        if not einstellungen.teilung:
+            print("Teilung abgeschaltet: jede Datei wird als ein PUT übertragen.", file=sys.stderr)
+        if plan.zu_gross:
+            print(
+                f"Warnung: {plan.zu_gross} Dateien sind größer als 5 GiB und werden ohne "
+                "Teilung fehlschlagen.",
+                file=sys.stderr,
+            )
         print(f"Zustandsdatei: {zustandsdatei}", file=sys.stderr)
         if args.probelauf:
             return EXIT_OK

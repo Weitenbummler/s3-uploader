@@ -158,3 +158,69 @@ def test_leere_datei_wird_hochgeladen(s3: Any, tmp_path: Path) -> None:
     ergebnis, _ = _lauf(s3, quelle, tmp_path)
     assert ergebnis.hochgeladen == 1
     assert lies_objekt(s3, "ziel/nichts.txt") == b""
+
+
+# --- Teilung abschaltbar (--ohne-teilung) ----------------------------------------------
+
+
+def test_ohne_teilung_geht_grosse_datei_als_ein_put(s3: Any, quelle: Path, tmp_path: Path) -> None:
+    zaehler = StoerClient(s3, fehlerhafte_teile=set())
+    ergebnis, fortschritt = _lauf(zaehler, quelle, tmp_path, teilung=False)
+    assert (ergebnis.hochgeladen, ergebnis.fehler) == (4, [])
+    assert zaehler.hochgeladene_teile == []  # kein einziges UploadPart
+    assert lies_objekt(s3, "ziel/gross.bin") == (quelle / "gross.bin").read_bytes()
+    stand = fortschritt.momentaufnahme()
+    assert stand.bytes_uebertragen == stand.bytes_gesamt  # nichts doppelt gezählt
+
+
+def test_plan_ohne_teilung_kennt_keine_multipart_dateien(
+    s3: Any, quelle: Path, tmp_path: Path
+) -> None:
+    einstellungen = _einstellungen(quelle, tmp_path, teilung=False)
+    dateien = list(finde_dateien(quelle, "ziel/"))
+    with Zustand(einstellungen.zustandsdatei) as zustand:
+        plan = Uploader(s3, BUCKET, einstellungen, zustand, Fortschritt()).plane(dateien)
+    assert (plan.einfach, plan.multipart, plan.zu_gross) == (4, 0, 0)
+
+
+def test_ohne_teilung_lehnt_dateien_ueber_5_gib_ab(
+    s3: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from s3_uploader import uploader as modul
+
+    monkeypatch.setattr(modul, "MAX_EINFACHER_PUT", 1024)  # 5 GiB im Test nachgebildet
+    quelle = tmp_path / "q"
+    quelle.mkdir()
+    (quelle / "zu_gross.bin").write_bytes(b"x" * 2048)
+    einstellungen = _einstellungen(quelle, tmp_path, teilung=False)
+    dateien = list(finde_dateien(quelle, "ziel/"))
+    with Zustand(einstellungen.zustandsdatei) as zustand:
+        uploader = Uploader(s3, BUCKET, einstellungen, zustand, Fortschritt())
+        assert uploader.plane(dateien).zu_gross == 1
+        ergebnis = uploader.lade_hoch(dateien)
+    assert ergebnis.fehler and "5 GiB" in ergebnis.fehler[0][1]
+
+
+def test_wechsel_auf_ohne_teilung_raeumt_begonnenen_multipart_auf(
+    s3: Any, quelle: Path, tmp_path: Path
+) -> None:
+    _lauf(StoerClient(s3, fehlerhafte_teile={2}), quelle, tmp_path)
+    assert s3.list_multipart_uploads(Bucket=BUCKET).get("Uploads")
+    ergebnis, _ = _lauf(s3, quelle, tmp_path, teilung=False)
+    assert ergebnis.fehler == []
+    assert not s3.list_multipart_uploads(Bucket=BUCKET).get("Uploads")
+    assert lies_objekt(s3, "ziel/gross.bin") == (quelle / "gross.bin").read_bytes()
+
+
+def test_fortschrittsleser_zaehlt_wiederholungen_nicht_doppelt(tmp_path: Path) -> None:
+    from s3_uploader.uploader import _FortschrittsLeser
+
+    pfad = tmp_path / "d"
+    pfad.write_bytes(b"a" * 100)
+    gemeldet: list[int] = []
+    with pfad.open("rb") as datei:
+        leser = _FortschrittsLeser(datei, gemeldet.append)
+        leser.read(60)
+        leser.seek(0)  # wie botocore bei einer Wiederholung
+        leser.read()
+    assert sum(gemeldet) == 100

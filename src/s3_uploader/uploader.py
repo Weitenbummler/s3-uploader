@@ -4,10 +4,11 @@ Ablauf je Datei (siehe auch ``docs/architektur.md``):
 
 1. Laut Zustandsdatei bereits erledigt und unverändert → überspringen.
 2. Optional: Objekt gleicher Größe existiert im Ziel → als erledigt merken, überspringen.
-3. Datei bis zur Schwelle → ein einzelnes ``PutObject``.
-4. Größere Datei → Multipart-Upload. Ein gespeicherter Upload wird fortgesetzt; welche
-   Teile fertig sind, fragt das Programm beim Server ab (``ListParts``), denn nur dessen
-   Auskunft ist verlässlich.
+3. Datei bis zur Schwelle oder Teilung abgeschaltet → ein einzelnes ``PutObject``
+   (höchstens 5 GiB, der Inhalt wird gestreamt statt ganz in den Speicher geladen).
+4. Größere Datei bei eingeschalteter Teilung → Multipart-Upload. Ein gespeicherter Upload
+   wird fortgesetzt; welche Teile fertig sind, fragt das Programm beim Server ab
+   (``ListParts``), denn nur dessen Auskunft ist verlässlich.
 
 Parallelität: Ein Thread-Pool bearbeitet mehrere Dateien gleichzeitig, jede
 Multipart-Datei nutzt zusätzlich einen eigenen kleinen Pool für ihre Teile. Höchstens
@@ -20,9 +21,11 @@ import base64
 import hashlib
 import logging
 import threading
+from collections.abc import Callable
 from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, as_completed, wait
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import IO, Any
 
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -31,7 +34,13 @@ from s3_uploader.dateisuche import Datei
 from s3_uploader.fehler import Abgebrochen, S3UploaderFehler, UploadFehler
 from s3_uploader.fortschritt import Fortschritt
 from s3_uploader.konfiguration import UploadEinstellungen
-from s3_uploader.planung import Teil, berechne_teilgroesse, braucht_multipart, zerlege
+from s3_uploader.planung import (
+    MAX_EINFACHER_PUT,
+    Teil,
+    berechne_teilgroesse,
+    braucht_multipart,
+    zerlege,
+)
 from s3_uploader.zustand import Zustand
 
 log = logging.getLogger(__name__)
@@ -63,6 +72,7 @@ class Plan:
         einfach: Offene Dateien, die mit einem PUT übertragen werden.
         multipart: Offene Dateien, die in Teilen übertragen werden.
         bytes_offen: Größe der offenen Dateien.
+        zu_gross: Offene Dateien über 5 GiB, die ohne Teilung nicht hochladbar sind.
     """
 
     dateien: int
@@ -71,6 +81,7 @@ class Plan:
     einfach: int
     multipart: int
     bytes_offen: int
+    zu_gross: int = 0
 
 
 class _Zaehler:
@@ -86,6 +97,49 @@ class _Zaehler:
     def plus(self, anzahl: int) -> None:
         with self._sperre:
             self.wert += anzahl
+
+
+_LESEBLOCK = 8 * 1024**2
+
+
+class _FortschrittsLeser:
+    """Hülle um eine geöffnete Datei, die gelesene Bytes an die Fortschrittsanzeige meldet.
+
+    So bewegt sich die Anzeige auch bei einem einzelnen großen ``PutObject``. botocore springt
+    bei einer Wiederholung mit ``seek(0)`` an den Anfang zurück; gemeldet wird deshalb nur,
+    was über die bisher weiteste Leseposition hinausgeht – nichts wird doppelt gezählt.
+
+    Args:
+        datei: Zum Lesen geöffnete Datei.
+        melde: Wird mit der Anzahl neu gelesener Bytes aufgerufen.
+    """
+
+    def __init__(self, datei: IO[bytes], melde: Callable[[int], None]) -> None:
+        self._datei = datei
+        self._melde = melde
+        self._weiteste = 0
+
+    def read(self, anzahl: int = -1) -> bytes:
+        """Liest wie ``IO.read`` und meldet neu erreichte Bytes."""
+        daten = self._datei.read(anzahl)
+        position = self._datei.tell()
+        if position > self._weiteste:
+            self._melde(position - self._weiteste)
+            self._weiteste = position
+        return daten
+
+    def __getattr__(self, name: str) -> Any:
+        # seek, tell, close … reicht die Hülle unverändert an die Datei durch.
+        return getattr(self._datei, name)
+
+
+def _md5_datei_base64(pfad: Path) -> str:
+    """Berechnet ``Content-MD5`` blockweise, ohne die Datei ganz in den Speicher zu laden."""
+    pruefsumme = hashlib.md5(usedforsecurity=False)
+    with pfad.open("rb") as datei:
+        while block := datei.read(_LESEBLOCK):
+            pruefsumme.update(block)
+    return base64.b64encode(pruefsumme.digest()).decode()
 
 
 def _md5_base64(daten: bytes) -> str:
@@ -142,7 +196,8 @@ class Uploader:
             Vorschau des Laufs.
         """
         offen = [d for d in dateien if not self._zustand.ist_erledigt(d)]
-        anzahl_multipart = sum(braucht_multipart(d.groesse, self._e.schwelle) for d in offen)
+        anzahl_multipart = sum(self._in_teilen(d) for d in offen)
+        zu_gross = 0 if self._e.teilung else sum(d.groesse > MAX_EINFACHER_PUT for d in offen)
         return Plan(
             dateien=len(dateien),
             bytes_gesamt=sum(d.groesse for d in dateien),
@@ -150,6 +205,7 @@ class Uploader:
             einfach=len(offen) - anzahl_multipart,
             multipart=anzahl_multipart,
             bytes_offen=sum(d.groesse for d in offen),
+            zu_gross=zu_gross,
         )
 
     def lade_hoch(self, dateien: list[Datei]) -> Ergebnis:
@@ -210,7 +266,7 @@ class Uploader:
 
         gemeldet = _Zaehler()  # An die Anzeige gemeldete Bytes, für den Fehlerfall
         try:
-            if braucht_multipart(datei.groesse, self._e.schwelle):
+            if self._in_teilen(datei):
                 self._multipart(datei, gemeldet)
             else:
                 self._einfach(datei, gemeldet)
@@ -221,6 +277,10 @@ class Uploader:
             raise
         self._fortschritt.datei_hochgeladen()
         return True
+
+    def _in_teilen(self, datei: Datei) -> bool:
+        """Entscheidet, ob eine Datei per Multipart übertragen wird."""
+        return self._e.teilung and braucht_multipart(datei.groesse, self._e.schwelle)
 
     def _existiert_im_ziel(self, datei: Datei) -> bool:
         """Prüft per ``HeadObject``, ob ein Objekt gleicher Größe im Ziel liegt."""
@@ -243,15 +303,45 @@ class Uploader:
             raise UploadFehler("Datei wurde während des Uploads verändert")
 
     def _einfach(self, datei: Datei, gemeldet: _Zaehler) -> None:
-        """Lädt eine kleine Datei mit einem einzigen ``PutObject`` hoch."""
-        daten = datei.pfad.read_bytes()
+        """Lädt eine Datei mit einem einzigen ``PutObject`` hoch.
+
+        Der Inhalt wird aus der Datei gestreamt, damit auch Dateien bis 5 GiB (bei
+        abgeschalteter Teilung) nicht vollständig im Speicher liegen. Die Prüfsumme wird
+        vorab in einem eigenen Lesedurchgang berechnet.
+
+        Raises:
+            UploadFehler: Wenn die Datei größer als 5 GiB ist oder sich verändert hat.
+        """
+        if datei.groesse > MAX_EINFACHER_PUT:
+            raise UploadFehler(
+                "Datei ist größer als 5 GiB – ohne Teilung nicht möglich (--ohne-teilung weglassen)"
+            )
+        # Ein mit Teilung begonnener Upload derselben Datei würde sonst als Rest im Bucket bleiben.
+        offene_id = self._zustand.offener_upload(datei.schluessel)
+        if offene_id is not None:
+            self._breche_upload_ab(datei, offene_id, "Teilung abgeschaltet")
+
+        content_md5 = _md5_datei_base64(datei.pfad)
         self._pruefe_unveraendert(datei)
-        antwort = self._client.put_object(
-            Bucket=self._bucket, Key=datei.schluessel, Body=daten, ContentMD5=_md5_base64(daten)
-        )
+
+        def melde(anzahl: int) -> None:
+            self._fortschritt.bytes_uebertragen(anzahl)
+            gemeldet.plus(anzahl)
+
+        with datei.pfad.open("rb") as quelle:
+            antwort = self._client.put_object(
+                Bucket=self._bucket,
+                Key=datei.schluessel,
+                Body=_FortschrittsLeser(quelle, melde),
+                ContentLength=datei.groesse,
+                ContentMD5=content_md5,
+            )
+        self._pruefe_unveraendert(datei)
         self._zustand.markiere_erledigt(datei, antwort.get("ETag"))
-        self._fortschritt.bytes_uebertragen(len(daten))
-        gemeldet.plus(len(daten))
+        # Falls botocore weniger über read() gelesen hat als gemeldet (z. B. leere Datei).
+        rest = datei.groesse - gemeldet.wert
+        if rest > 0:
+            melde(rest)
 
     # --- Multipart ----------------------------------------------------------------------
 
@@ -305,12 +395,15 @@ class Uploader:
         Unvollständige Multipart-Uploads belegen sonst dauerhaft Speicher im Bucket.
         """
         alte_id = self._zustand.veralteter_upload(datei)
-        if alte_id is None:
-            return
-        log.info("Datei verändert, verwerfe alten Upload: %s", datei.schluessel)
+        if alte_id is not None:
+            self._breche_upload_ab(datei, alte_id, "Datei verändert")
+
+    def _breche_upload_ab(self, datei: Datei, upload_id: str, grund: str) -> None:
+        """Bricht einen Multipart-Upload ab und entfernt ihn aus der Zustandsdatei."""
+        log.info("%s, verwerfe begonnenen Upload: %s", grund, datei.schluessel)
         try:
             self._client.abort_multipart_upload(
-                Bucket=self._bucket, Key=datei.schluessel, UploadId=alte_id
+                Bucket=self._bucket, Key=datei.schluessel, UploadId=upload_id
             )
         except ClientError as err:
             if _fehlercode(err) != "NoSuchUpload":
