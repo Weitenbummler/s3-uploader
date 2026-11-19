@@ -6,9 +6,12 @@ Datenklassen. Alle übrigen Module arbeiten nur mit diesen Objekten (PY-P5, PY-T
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import os
 import re
+import ssl
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -107,6 +110,99 @@ def normalisiere_prefix(prefix: str) -> str:
     """
     teile = [teil for teil in prefix.replace("\\", "/").split("/") if teil]
     return "/".join(teile) + "/" if teile else ""
+
+
+_PEM_ANFANG = b"-----BEGIN CERTIFICATE-----"
+#: Größte geprüfte CA-Datei; Zertifikatsspeicher von Linux-Systemen sind rund 200 KB groß.
+_MAX_CA_GROESSE = 10 * 1024**2
+
+
+def pruefe_ca_datei(pfad: Path) -> None:
+    """Stellt sicher, dass eine CA-Datei im PEM-Format vorliegt, bevor die Verbindung startet.
+
+    Ohne diese Prüfung fiele ein falsches Format erst beim Verbindungsaufbau auf – mit einer
+    schwer verständlichen TLS-Meldung. Erkannt werden die drei häufigsten Fälle:
+
+    - binäres Format (DER), oft mit Endung ``.crt`` oder ``.cer``: beginnt mit dem Byte
+      ``0x30`` (ASN.1-Sequenz);
+    - Text in UTF-16, wie ihn Windows PowerShell 5.1 bei Umleitung mit ``>`` schreibt;
+    - Dateien ganz ohne Zertifikat (z. B. nur ein privater Schlüssel);
+    - doppelt kodierte Dateien: eine schon als Text vorliegende ``.crt`` wurde zusätzlich
+      mit ``certutil -encode`` umgewandelt (OpenSSL meldet dann ``[X509] PEM lib``);
+    - sonst beschädigte Inhalte – zum Schluss lädt die Prüfung die Datei probeweise mit dem
+      ``ssl``-Modul, genau wie später die Verbindung.
+
+    Args:
+        pfad: Pfad der angegebenen CA-Datei.
+
+    Raises:
+        KonfigurationsFehler: Wenn die Datei fehlt, zu groß ist oder kein PEM-Zertifikat enthält.
+    """
+    if not pfad.is_file():
+        raise KonfigurationsFehler(f"CA-Zertifikat nicht gefunden: {pfad}")
+    if pfad.stat().st_size > _MAX_CA_GROESSE:
+        raise KonfigurationsFehler(f"CA-Zertifikat ist unplausibel groß: {pfad}")
+    inhalt = pfad.read_bytes()
+    ziel = pfad.with_name(pfad.stem + "-ca.pem")
+    if _PEM_ANFANG in inhalt:
+        _pruefe_pem_inhalt(pfad, inhalt)
+        return
+    if inhalt.startswith((b"\xff\xfe", b"\xfe\xff")):
+        raise KonfigurationsFehler(
+            f"CA-Zertifikat {pfad} ist als UTF-16 gespeichert (typisch für '>' in Windows "
+            "PowerShell 5.1). Neu speichern mit: Get-Content "
+            f'"{pfad}" | Set-Content "{ziel}" -Encoding ascii'
+        )
+    if inhalt[:1] == b"\x30":
+        raise KonfigurationsFehler(
+            f"CA-Zertifikat {pfad} ist im binären Format (DER) und muss einmal in das "
+            "Textformat PEM umgewandelt werden. "
+            f'Windows: certutil -encode "{pfad}" "{ziel}" – '
+            f'macOS/Linux: openssl x509 -inform der -in "{pfad}" -out "{ziel}". '
+            "Danach die neue Datei angeben."
+        )
+    raise KonfigurationsFehler(
+        f"{pfad} enthält kein Zertifikat (keine Zeile '-----BEGIN CERTIFICATE-----'). "
+        "Benötigt wird das Zertifikat der Zertifizierungsstelle, kein privater Schlüssel."
+    )
+
+
+def _pruefe_pem_inhalt(pfad: Path, inhalt: bytes) -> None:
+    """Prüft die Zertifikatsblöcke einer PEM-Datei und lädt sie probeweise.
+
+    Args:
+        pfad: Pfad der Datei (für Meldungen).
+        inhalt: Dateiinhalt.
+
+    Raises:
+        KonfigurationsFehler: Wenn ein Block doppelt kodiert oder beschädigt ist.
+    """
+    bloecke = re.findall(
+        rb"-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----", inhalt, flags=re.S
+    )
+    for block in bloecke:
+        try:
+            roh = base64.b64decode(b"".join(block.split()), validate=True)
+        except (binascii.Error, ValueError):
+            roh = b""
+        if roh.startswith(b"-----BEGIN"):
+            raise KonfigurationsFehler(
+                f"CA-Zertifikat {pfad} ist doppelt kodiert: Die Ausgangsdatei war bereits im "
+                "Textformat PEM und wurde zusätzlich umgewandelt (z. B. mit certutil -encode). "
+                "Stattdessen die ursprüngliche .crt-Datei direkt mit --ca-zertifikat angeben."
+            )
+        if roh[:1] != b"\x30":
+            raise KonfigurationsFehler(
+                f"CA-Zertifikat {pfad} ist beschädigt (Inhalt zwischen BEGIN und END ist kein "
+                "gültiges Zertifikat). Datei neu vom Betreiber besorgen oder neu exportieren."
+            )
+    try:
+        ssl.create_default_context(cafile=str(pfad))
+    except ssl.SSLError as err:
+        raise KonfigurationsFehler(
+            f"CA-Zertifikat {pfad} kann nicht geladen werden ({err}). Datei neu vom Betreiber "
+            "besorgen oder neu exportieren."
+        ) from err
 
 
 def parse_groesse(text: str) -> int:

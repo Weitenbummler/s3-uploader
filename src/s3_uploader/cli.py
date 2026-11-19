@@ -33,6 +33,7 @@ from s3_uploader.konfiguration import (
     Verbindung,
     normalisiere_prefix,
     parse_groesse,
+    pruefe_ca_datei,
     quellkennung,
     standard_zustandsdatei,
 )
@@ -231,8 +232,7 @@ def _lies_verbindung(args: argparse.Namespace) -> Verbindung:
                 "--ca-zertifikat und --ohne-tls-pruefung schließen sich aus."
             )
         ca_zertifikat = Path(args.ca_zertifikat).expanduser()
-        if not ca_zertifikat.is_file():
-            raise KonfigurationsFehler(f"CA-Zertifikat nicht gefunden: {ca_zertifikat}")
+        pruefe_ca_datei(ca_zertifikat)
     passwort = args.passwort
     if not passwort:
         if not sys.stdin.isatty():

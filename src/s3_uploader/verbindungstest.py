@@ -37,6 +37,11 @@ def _beschreibe_fehler(err: Exception) -> str:
                 "Zertifizierungsstelle – deren Zertifikat mit --ca-zertifikat DATEI.pem angeben "
                 "(siehe README). Nur zum Testen: --ohne-tls-pruefung."
             )
+        if "PEM lib" in text or "NO_CERTIFICATE_OR_CRL_FOUND" in text:
+            return (
+                "Die Zertifikatsdatei (--ca-zertifikat, S3_CA_ZERTIFIKAT oder AWS_CA_BUNDLE) "
+                "ist nicht lesbar – Format prüfen (siehe README, Abschnitt Zertifikat)."
+            )
         if "expired" in text:
             return "Zertifikat des Endpunkts ist abgelaufen – Betreiber des Speichers informieren."
         if "hostname" in text.lower() or "match" in text.lower():
