@@ -5,7 +5,7 @@ Verzeichnis in einen S3-Bucket hochlädt – mit Verbindungstest, Fortschrittsan
 und Wiederaufsetzen nach Abbrüchen. Funktioniert mit AWS S3 und S3-kompatiblen
 Speichern (MinIO, Ceph, NetApp StorageGRID, Wasabi, Hetzner, IONOS …).
 
-Lizenz: [MIT](LICENSE). Entwickelt nach den (intern gepflegten) python-richtlinien 1.1.0.
+Lizenz: [MIT](LICENSE). Entwickelt nach den (intern gepflegten) python-richtlinien 1.2.0.
 
 > Das führende Repository liegt in einer privaten Gitea-Instanz; [github.com/Weitenbummler/s3-uploader](https://github.com/Weitenbummler/s3-uploader) ist ein automatisch gespiegelter, schreibgeschützter Stand. Änderungen direkt auf GitHub werden beim nächsten Abgleich überschrieben – Hinweise und Fehler bitte als Issue melden.
 
@@ -39,6 +39,14 @@ Alles danach ([Parameter](#parameter-und-umgebungsvariablen), [Optionen](#option
 [Exit-Codes](#exit-codes) …) gilt für alle Systeme gleich.
 
 Gemeinsame Voraussetzung: **Python 3.11 oder neuer** und Netzwerkzugang zum S3-Endpunkt.
+
+**Getestet unter** (Version 0.2.1):
+
+| System | Python | Kommandozeile | Geprüft |
+|---|---|---|---|
+| Windows 11 (Build 26300) | 3.15.2 | PowerShell 5.1 | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, Umlaute und Leerzeichen in Pfaden |
+| macOS 27.2.1 | 3.11 | zsh | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung` |
+| Linux | – | – | **noch nicht geprüft** (nur statische Typprüfung für Linux) |
 
 ---
 
@@ -688,7 +696,13 @@ Alle Optionen mit Erklärung: `s3-uploader hochladen --help`.
 | [`requirements-dev.txt`](requirements-dev.txt) | zusätzlich `pytest`, `pytest-cov`, `moto`, `ruff`, `mypy` | Entwicklung und Tests |
 
 `pyproject.toml` liest die Laufzeit-Abhängigkeiten direkt aus `requirements.txt`; sie
-stehen also nur an einer Stelle. Paket bauen (Wheel unter `dist/`):
+stehen also nur an einer Stelle.
+
+Vor einem Release laufen die Prüfungen auf allen drei Systemen, außerdem die Typprüfung für
+jede Plattform: `mypy --platform win32 src`, `mypy --platform darwin src` und
+`mypy --platform linux src`.
+
+Paket bauen (Wheel unter `dist/`):
 `pip install build` und danach `python -m build`.
 
 ## Dokumentation

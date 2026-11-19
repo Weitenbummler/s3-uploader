@@ -9,6 +9,8 @@ Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen 
 - README: Einrichtung und Start vollständig nach Betriebssystem getrennt (Windows/PowerShell,
   macOS, Linux), je mit Python-Installation, Umgebung, Installation, Prüfung, Start, neuem
   Fenster, Aktualisieren/Deinstallieren, Offline-Installation, Entwicklung und Hinweisen.
+- README: Tabelle „Getestet unter“; Linux ist noch nicht geprüft.
+- Folgt python-richtlinien 1.2.0.
 - README Windows: Freigabe per `Set-ExecutionPolicy -Scope Process` ist regulärer Schritt,
   weil Windows die Aktivierung standardmäßig sperrt.
 
