@@ -3,6 +3,15 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+- MIT-Lizenz.
+- Spiegelung nach GitHub (github.com/Weitenbummler/s3-uploader), Hinweis im README.
+
+### Geändert
+- Klon-Anleitung verweist auf das öffentliche GitHub-Repository statt auf die interne Gitea-Adresse.
+
 ## [0.1.0] – 2026-11-19
 
 ### Hinzugefügt

@@ -5,7 +5,9 @@ Verzeichnis in einen S3-Bucket hochlädt – mit Verbindungstest, Fortschrittsan
 und Wiederaufsetzen nach Abbrüchen. Funktioniert mit AWS S3 und S3-kompatiblen
 Speichern (MinIO, Ceph, NetApp StorageGRID, Wasabi, Hetzner, IONOS …).
 
-Folgt [python-richtlinien](http://192.168.10.60:3000/claude-bot/python-richtlinien) 1.1.0.
+Lizenz: [MIT](LICENSE). Entwickelt nach den (intern gepflegten) python-richtlinien 1.1.0.
+
+> Das führende Repository liegt in einer privaten Gitea-Instanz; [github.com/Weitenbummler/s3-uploader](https://github.com/Weitenbummler/s3-uploader) ist ein automatisch gespiegelter, schreibgeschützter Stand. Änderungen direkt auf GitHub werden beim nächsten Abgleich überschrieben – Hinweise und Fehler bitte als Issue melden.
 
 ## Funktionen
 
@@ -44,7 +46,7 @@ Python installieren, falls nötig:
 ### 1. Quellcode holen
 
 ```bash
-git clone http://192.168.10.60:3000/claude-bot/s3-uploader.git
+git clone https://github.com/Weitenbummler/s3-uploader.git
 cd s3-uploader
 ```
 
@@ -245,3 +247,5 @@ Paket bauen (Wheel unter `dist/`): `pip install build && python -m build`.
 | pytest, pytest-cov | MIT | Entwicklung |
 | moto | Apache-2.0 | Entwicklung |
 | ruff, mypy | MIT | Entwicklung |
+
+s3-uploader selbst steht unter der [MIT-Lizenz](LICENSE).
