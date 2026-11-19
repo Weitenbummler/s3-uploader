@@ -1,0 +1,5 @@
+# Laufzeit-Abhängigkeiten von s3-uploader.
+# Einzige Quelle: pyproject.toml liest diese Datei (dynamic dependencies).
+#
+# boto3 – AWS SDK für Python (Apache-2.0); >= 1.36 wegen request_checksum_calculation.
+boto3>=1.36

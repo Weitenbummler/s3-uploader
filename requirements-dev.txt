@@ -1,0 +1,8 @@
+# Zusatzmodule für Entwicklung und Tests (nicht für den Betrieb nötig).
+-r requirements.txt
+
+pytest>=8          # Testlauf (MIT)
+pytest-cov>=5      # Testabdeckung (MIT)
+moto[s3]>=5        # S3-Attrappe für Tests ohne Netzwerk (Apache-2.0)
+ruff>=0.6          # Formatierung und Linting (MIT)
+mypy>=1.10         # Statische Typprüfung (MIT)
