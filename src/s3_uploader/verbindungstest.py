@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
+from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError, SSLError
 
 from s3_uploader.client import S3Client
 
@@ -28,6 +29,22 @@ class Pruefung:
 
 def _beschreibe_fehler(err: Exception) -> str:
     """Übersetzt typische Fehler in verständliche Hinweise."""
+    if isinstance(err, SSLError):
+        text = str(err)
+        if re.search(r"self[- ]signed|unable to get local issuer", text):
+            return (
+                "Zertifikat des Endpunkts ist selbst signiert oder von einer eigenen "
+                "Zertifizierungsstelle – deren Zertifikat mit --ca-zertifikat DATEI.pem angeben "
+                "(siehe README). Nur zum Testen: --ohne-tls-pruefung."
+            )
+        if "expired" in text:
+            return "Zertifikat des Endpunkts ist abgelaufen – Betreiber des Speichers informieren."
+        if "hostname" in text.lower() or "match" in text.lower():
+            return (
+                "Zertifikat passt nicht zum Namen des Endpunkts – genau den Namen aus dem "
+                "Zertifikat in --endpunkt verwenden (nicht die IP-Adresse oder einen Alias)."
+            )
+        return f"TLS-Fehler: {text} – Zertifikat prüfen, ggf. --ca-zertifikat angeben."
     if isinstance(err, EndpointConnectionError):
         return "Endpunkt nicht erreichbar – URL, Port, Netzwerk oder Firewall prüfen."
     if isinstance(err, ClientError):

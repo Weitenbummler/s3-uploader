@@ -26,3 +26,16 @@ def test_fehlender_bucket_bricht_frueh_ab(s3: Any) -> None:
 
 def test_ohne_schreibtest_nur_lesen(s3: Any) -> None:
     assert len(teste_verbindung(s3, BUCKET, "")) == 2
+
+
+def test_selbst_signiertes_zertifikat_bekommt_klaren_hinweis() -> None:
+    from botocore.exceptions import SSLError
+
+    from s3_uploader.verbindungstest import _beschreibe_fehler
+
+    fehler = SSLError(
+        endpoint_url="https://s3.intern",
+        error="[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+        "self-signed certificate in certificate chain",
+    )
+    assert "--ca-zertifikat" in _beschreibe_fehler(fehler)

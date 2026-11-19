@@ -14,7 +14,32 @@ from s3_uploader.konfiguration import Verbindung
 S3Client = Any
 
 
-def erzeuge_client(verbindung: Verbindung, max_verbindungen: int = 10) -> S3Client:
+def tls_pruefung(verbindung: Verbindung) -> bool | str | None:
+    """Bestimmt den Wert für boto3s Parameter ``verify``.
+
+    - ``False``: keine Prüfung (``--ohne-tls-pruefung``).
+    - Pfad als Text: nur Zertifizierungsstellen aus dieser PEM-Datei gelten
+      (``--ca-zertifikat``).
+    - ``None``: boto3 entscheidet selbst – öffentliche Zertifizierungsstellen oder, falls
+      gesetzt, die Datei aus der Umgebungsvariablen ``AWS_CA_BUNDLE``. Ein festes ``True``
+      wäre hier falsch, denn damit übergeht boto3 ``AWS_CA_BUNDLE``.
+
+    Args:
+        verbindung: Verbindungsangaben.
+
+    Returns:
+        Wert für ``verify``.
+    """
+    if not verbindung.tls_pruefen:
+        return False
+    if verbindung.ca_zertifikat is not None:
+        return str(verbindung.ca_zertifikat)
+    return None
+
+
+def erzeuge_client(
+    verbindung: Verbindung, max_verbindungen: int = 10, max_versuche: int = 10
+) -> S3Client:
     """Erzeugt einen S3-Client für einen beliebigen S3-kompatiblen Endpunkt.
 
     Wichtige Einstellungen:
@@ -26,10 +51,14 @@ def erzeuge_client(verbindung: Verbindung, max_verbindungen: int = 10) -> S3Clie
       Integrität sichert s3-uploader stattdessen selbst über ``Content-MD5``.
     - Der Verbindungspool wird an die Parallelität angepasst, sonst warten Threads auf
       freie Verbindungen.
+    - Zertifikatsprüfung siehe :func:`tls_pruefung`.
 
     Args:
         verbindung: Endpunkt und Zugangsdaten.
         max_verbindungen: Größe des HTTP-Verbindungspools.
+        max_versuche: Versuche je Anfrage. Für Prüfungen klein halten: Auch dauerhafte
+            Fehler wie ein unbekanntes Zertifikat wiederholt boto3 sonst mehrfach mit
+            wachsender Wartezeit, und die Meldung käme erst nach rund einer halben Minute.
 
     Returns:
         boto3-S3-Client.
@@ -38,7 +67,7 @@ def erzeuge_client(verbindung: Verbindung, max_verbindungen: int = 10) -> S3Clie
         region_name=verbindung.region,
         connect_timeout=15,
         read_timeout=120,
-        retries={"max_attempts": 10, "mode": "adaptive"},
+        retries={"max_attempts": max_versuche, "mode": "adaptive"},
         max_pool_connections=max_verbindungen,
         s3={"addressing_style": verbindung.adressierung},
         request_checksum_calculation="when_required",
@@ -49,6 +78,6 @@ def erzeuge_client(verbindung: Verbindung, max_verbindungen: int = 10) -> S3Clie
         endpoint_url=verbindung.endpunkt,
         aws_access_key_id=verbindung.access_key,
         aws_secret_access_key=verbindung.secret_key,
-        verify=verbindung.tls_pruefen,
+        verify=tls_pruefung(verbindung),
         config=konfig,
     )

@@ -43,6 +43,8 @@ from s3_uploader.verbindungstest import teste_verbindung
 from s3_uploader.zustand import Zustand
 
 EXIT_OK = 0
+#: Versuche je Anfrage beim Verbindungstest und bei der Vorabprüfung (schnelle Rückmeldung).
+PRUEF_VERSUCHE = 2
 EXIT_FEHLER = 1
 EXIT_BEDIENUNG = 2
 EXIT_ABBRUCH = 130
@@ -94,6 +96,14 @@ def erzeuge_parser() -> argparse.ArgumentParser:
         choices=["path", "virtual", "auto"],
         default="path",
         help="Adressierungsart (Standard: path, passend für MinIO, Ceph u. a.)",
+    )
+    ziel.add_argument(
+        "--ca-zertifikat",
+        type=Path,
+        default=_umgebung("S3_CA_ZERTIFIKAT"),
+        metavar="DATEI",
+        help="PEM-Datei der Zertifizierungsstelle bei selbst signierten oder firmeneigenen "
+        "Zertifikaten (S3_CA_ZERTIFIKAT)",
     )
     ziel.add_argument(
         "--ohne-tls-pruefung",
@@ -214,6 +224,15 @@ def _lies_verbindung(args: argparse.Namespace) -> Verbindung:
     ]
     if fehlend:
         raise KonfigurationsFehler("Fehlende Angabe: " + ", ".join(fehlend))
+    ca_zertifikat: Path | None = None
+    if args.ca_zertifikat:
+        if args.ohne_tls_pruefung:
+            raise KonfigurationsFehler(
+                "--ca-zertifikat und --ohne-tls-pruefung schließen sich aus."
+            )
+        ca_zertifikat = Path(args.ca_zertifikat).expanduser()
+        if not ca_zertifikat.is_file():
+            raise KonfigurationsFehler(f"CA-Zertifikat nicht gefunden: {ca_zertifikat}")
     passwort = args.passwort
     if not passwort:
         if not sys.stdin.isatty():
@@ -227,6 +246,7 @@ def _lies_verbindung(args: argparse.Namespace) -> Verbindung:
         region=args.region,
         adressierung=args.adressierung,
         tls_pruefen=not args.ohne_tls_pruefung,
+        ca_zertifikat=ca_zertifikat,
     )
 
 
@@ -243,7 +263,10 @@ def befehl_test(args: argparse.Namespace) -> int:
     prefix = normalisiere_prefix(args.prefix)
     print(f"Teste {verbindung.endpunkt} – Bucket {verbindung.bucket!r}, Präfix {prefix!r}")
     ergebnisse = teste_verbindung(
-        erzeuge_client(verbindung), verbindung.bucket, prefix, args.schreibtest
+        erzeuge_client(verbindung, max_versuche=PRUEF_VERSUCHE),
+        verbindung.bucket,
+        prefix,
+        args.schreibtest,
     )
     for pruefung in ergebnisse:
         print(f"  [{'OK  ' if pruefung.ok else 'FEHL'}] {pruefung.name}: {pruefung.hinweis}")
@@ -313,6 +336,16 @@ def befehl_hochladen(args: argparse.Namespace) -> int:
         print(f"Zustandsdatei: {zustandsdatei}", file=sys.stderr)
         if args.probelauf:
             return EXIT_OK
+
+        # Vorabprüfung: Ein falsches Zertifikat, Passwort oder ein fehlender Bucket betrifft
+        # jede Datei. Ohne diese Prüfung würde jede einzelne Datei mehrfach scheitern.
+        vorab = teste_verbindung(
+            erzeuge_client(verbindung, max_versuche=PRUEF_VERSUCHE), verbindung.bucket, prefix
+        )
+        fehlschlag = next((p for p in vorab if not p.ok), None)
+        if fehlschlag is not None:
+            print(f"Abbruch vor dem Upload – {fehlschlag.name}: {fehlschlag.hinweis}")
+            return EXIT_FEHLER
 
         beginn = time.monotonic()
         if args.still:

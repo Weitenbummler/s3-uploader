@@ -105,3 +105,27 @@ def test_ohne_teilung_per_parameter(
     fehler = capsys.readouterr().err
     assert "0 in Teilen" in fehler and "Teilung abgeschaltet" in fehler
     assert lies_objekt(s3, "cli/gross.bin") == (quelle / "gross.bin").read_bytes()
+
+
+def test_hochladen_bricht_vor_dem_upload_ab_wenn_bucket_fehlt(
+    s3: Any, quelle: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from s3_uploader.cli import EXIT_FEHLER
+
+    argumente = [
+        "hochladen",
+        "--endpunkt",
+        "https://s3.amazonaws.com",
+        "--bucket",
+        "gibtsnicht",
+        "--access-key",
+        "testkey",
+        "--quelle",
+        str(quelle),
+        "--zustand",
+        str(tmp_path / "z.sqlite"),
+        "--still",
+    ]
+    assert main(argumente) == EXIT_FEHLER
+    ausgabe = capsys.readouterr().out
+    assert "Abbruch vor dem Upload" in ausgabe and "Bucket existiert nicht" in ausgabe

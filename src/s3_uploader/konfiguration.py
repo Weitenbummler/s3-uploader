@@ -46,6 +46,10 @@ class Verbindung:
         region: Region für die Signatur; S3-kompatible Speicher akzeptieren meist jede.
         adressierung: Adressierungsart, siehe :data:`Adressierung`.
         tls_pruefen: Ob das TLS-Zertifikat des Endpunkts geprüft wird.
+        ca_zertifikat: PEM-Datei mit dem Zertifikat (oder mehreren) der Zertifizierungsstelle,
+            die das Serverzertifikat ausgestellt hat – nötig bei selbst signierten oder
+            firmeneigenen Zertifikaten. ``None`` nimmt die üblichen öffentlichen
+            Zertifizierungsstellen bzw. die Umgebungsvariable ``AWS_CA_BUNDLE``.
     """
 
     endpunkt: str
@@ -55,6 +59,7 @@ class Verbindung:
     region: str = "us-east-1"
     adressierung: Adressierung = "path"
     tls_pruefen: bool = True
+    ca_zertifikat: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
