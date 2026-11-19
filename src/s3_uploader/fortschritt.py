@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import TextIO
 
+from s3_uploader.terminal import Terminal
+
 _EINHEITEN = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
 
 
@@ -229,9 +231,8 @@ class Anzeige:
         intervall_protokoll: float = 30.0,
     ) -> None:
         self._fortschritt = fortschritt
-        self._ausgabe = ausgabe
-        self._ist_terminal = ausgabe.isatty()
-        self._intervall = intervall if self._ist_terminal else intervall_protokoll
+        self._terminal = Terminal(ausgabe)
+        self._intervall = intervall if self._terminal.ist_terminal else intervall_protokoll
         self._stopp = threading.Event()
         self._thread = threading.Thread(target=self._schleife, name="anzeige", daemon=True)
 
@@ -255,19 +256,25 @@ class Anzeige:
 
     def _zeichne(self, abschluss: bool = False) -> None:
         zeile = self._fortschritt.momentaufnahme().als_zeile()
-        if self._ist_terminal:
-            # \r springt an den Zeilenanfang, \033[K löscht den Rest der alten Zeile.
-            self._ausgabe.write("\r\033[K" + zeile + ("\n" if abschluss else ""))
+        if self._terminal.ist_terminal:
+            self._terminal.ueberschreibe(zeile, abschluss)
         else:
-            self._ausgabe.write(zeile + "\n")
-        self._ausgabe.flush()
+            self._terminal.ausgabe.write(zeile + "\n")
+            self._terminal.ausgabe.flush()
 
 
 class ZeilenfesterHandler(logging.StreamHandler):  # type: ignore[type-arg]
     """Logging-Handler, der vor jeder Meldung die laufende Fortschrittszeile löscht.
 
     Ohne ihn würde eine Warnung mitten in die überschriebene Fortschrittszeile geschrieben.
+
+    Args:
+        ausgabe: Zielstrom, üblicherweise ``sys.stderr``.
     """
+
+    def __init__(self, ausgabe: TextIO) -> None:
+        super().__init__(ausgabe)
+        self._terminal = Terminal(ausgabe)
 
     def emit(self, record: logging.LogRecord) -> None:
         """Gibt eine Meldung aus und löscht im Terminal vorher die aktuelle Zeile.
@@ -275,6 +282,6 @@ class ZeilenfesterHandler(logging.StreamHandler):  # type: ignore[type-arg]
         Args:
             record: Zu protokollierende Meldung.
         """
-        if self.stream.isatty():
-            self.stream.write("\r\033[K")
+        if self._terminal.ist_terminal:
+            self.stream.write(self._terminal.loesch_text())
         super().emit(record)

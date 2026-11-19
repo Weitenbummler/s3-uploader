@@ -33,9 +33,11 @@ from s3_uploader.konfiguration import (
     Verbindung,
     normalisiere_prefix,
     parse_groesse,
+    quellkennung,
     standard_zustandsdatei,
 )
 from s3_uploader.planung import pruefe_schwelle
+from s3_uploader.terminal import bereite_konsole_vor
 from s3_uploader.uploader import Uploader
 from s3_uploader.verbindungstest import teste_verbindung
 from s3_uploader.zustand import Zustand
@@ -285,7 +287,7 @@ def befehl_hochladen(args: argparse.Namespace) -> int:
 
     print(f"Durchsuche {quelle} …", file=sys.stderr)
     dateien = list(finde_dateien(quelle, prefix, einstellungen.ausschluesse))
-    kontext = f"{verbindung.endpunkt}|{verbindung.bucket}|{prefix}|{quelle.resolve()}"
+    kontext = f"{verbindung.endpunkt}|{verbindung.bucket}|{prefix}|{quellkennung(quelle)}"
     with Zustand(zustandsdatei) as zustand:
         zustand.pruefe_kontext(kontext)
         client = erzeuge_client(
@@ -343,6 +345,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         Exit-Code.
     """
+    bereite_konsole_vor()
     parser = erzeuge_parser()
     try:
         args = parser.parse_args(argv)

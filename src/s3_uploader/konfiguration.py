@@ -7,6 +7,7 @@ Datenklassen. Alle übrigen Module arbeiten nur mit diesen Objekten (PY-P5, PY-T
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -122,8 +123,25 @@ def parse_groesse(text: str) -> int:
     return int(zahl * _EINHEITEN[treffer.group(2).upper()])
 
 
+def quellkennung(quelle: Path) -> str:
+    r"""Liefert eine eindeutige Schreibweise des Quellverzeichnisses.
+
+    Unter Windows sind Pfade unabhängig von Groß-/Kleinschreibung und ``/`` ist gleich ``\``.
+    ``D:\Daten`` und ``d:/daten`` müssen deshalb dieselbe Zustandsdatei finden, sonst würde
+    ein Fortsetzen von vorn beginnen. ``os.path.normcase`` gleicht das an; unter macOS und
+    Linux lässt es den Pfad unverändert.
+
+    Args:
+        quelle: Quellverzeichnis.
+
+    Returns:
+        Absoluter, vereinheitlichter Pfad als Text.
+    """
+    return os.path.normcase(str(quelle.resolve()))
+
+
 def standard_zustandsdatei(verbindung: Verbindung, quelle: Path, prefix: str) -> Path:
-    """Ermittelt den Standardort der Zustandsdatei für eine Kombination aus Quelle und Ziel.
+    r"""Ermittelt den Standardort der Zustandsdatei für eine Kombination aus Quelle und Ziel.
 
     Der Dateiname enthält einen Hash aus Endpunkt, Bucket, Präfix und Quellpfad. Derselbe
     Aufruf findet dadurch beim Wiederaufsetzen automatisch seine Zustandsdatei wieder,
@@ -136,8 +154,8 @@ def standard_zustandsdatei(verbindung: Verbindung, quelle: Path, prefix: str) ->
         prefix: Normalisiertes Präfix.
 
     Returns:
-        Pfad unter ``~/.s3-uploader/``.
+        Pfad unter ``~/.s3-uploader/`` (Windows: ``%USERPROFILE%\.s3-uploader\``).
     """
-    kennung = f"{verbindung.endpunkt}|{verbindung.bucket}|{prefix}|{quelle.resolve()}"
+    kennung = f"{verbindung.endpunkt}|{verbindung.bucket}|{prefix}|{quellkennung(quelle)}"
     kurz = hashlib.sha256(kennung.encode()).hexdigest()[:16]
     return Path.home() / ".s3-uploader" / f"zustand-{kurz}.sqlite"

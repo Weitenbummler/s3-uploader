@@ -17,7 +17,10 @@ def test_ausschluesse_greifen(quelle: Path) -> None:
 
 
 def test_symlinks_werden_nicht_verfolgt(quelle: Path) -> None:
-    (quelle / "verweis").symlink_to(quelle / "unter")
+    try:
+        (quelle / "verweis").symlink_to(quelle / "unter", target_is_directory=True)
+    except OSError:  # Windows: Links brauchen Entwicklermodus oder Administratorrechte
+        pytest.skip("Symbolische Links können hier nicht angelegt werden")
     schluessel = {d.schluessel for d in finde_dateien(quelle, "")}
     assert not any(s.startswith("verweis") for s in schluessel)
 

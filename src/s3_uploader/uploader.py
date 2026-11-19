@@ -21,8 +21,14 @@ import base64
 import hashlib
 import logging
 import threading
-from collections.abc import Callable
-from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, as_completed, wait
+from collections.abc import Callable, Iterator
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    FIRST_EXCEPTION,
+    Future,
+    ThreadPoolExecutor,
+    wait,
+)
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Any
@@ -151,6 +157,19 @@ def _md5_base64(daten: bytes) -> str:
     return base64.b64encode(hashlib.md5(daten, usedforsecurity=False).digest()).decode()
 
 
+def _fertige_auftraege(offen: set[Future[bool]]) -> Iterator[Future[bool]]:
+    """Liefert abgeschlossene Aufträge in Fertigstellungsreihenfolge, unterbrechbar mit Strg+C.
+
+    ``concurrent.futures.as_completed`` wartet ohne Zeitgrenze. Unter Windows kann ein solches
+    Warten nicht durch Strg+C unterbrochen werden; der Abbruch käme erst, wenn die nächste
+    Datei fertig ist – bei großen Dateien nach Minuten. Mit kurzer Zeitgrenze prüft Python
+    regelmäßig, ob Strg+C gedrückt wurde.
+    """
+    while offen:
+        fertig, offen = wait(offen, timeout=0.5, return_when=FIRST_COMPLETED)
+        yield from fertig
+
+
 def _fehlercode(err: ClientError) -> str:
     return str(err.response.get("Error", {}).get("Code", ""))
 
@@ -226,7 +245,7 @@ class Uploader:
         pool = ThreadPoolExecutor(self._e.parallel_dateien, thread_name_prefix="datei")
         try:
             auftraege = {pool.submit(self._verarbeite, d): d for d in dateien}
-            for auftrag in as_completed(auftraege):
+            for auftrag in _fertige_auftraege(set(auftraege)):
                 datei = auftraege[auftrag]
                 try:
                     if auftrag.result():
