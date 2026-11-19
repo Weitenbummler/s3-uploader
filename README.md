@@ -39,8 +39,10 @@ Python installieren, falls nötig:
 - **macOS** (Homebrew): `brew install python@3.12`
 - **Debian/Ubuntu**: `sudo apt install python3 python3-venv python3-pip`
 - **RHEL/Fedora**: `sudo dnf install python3 python3-pip`
-- **Windows**: Installer von <https://www.python.org/downloads/>, Option „Add python.exe to PATH“
-  anhaken; in den Befehlen unten `py` statt `python3` verwenden.
+- **Windows**: Installer von <https://www.python.org/downloads/> (bzw. „Python Install
+  Manager“). Danach steht der Starter `py` zur Verfügung. `python3` und oft auch `python`
+  sind unter Windows nur Verknüpfungen zum Microsoft Store und melden „Python wurde nicht
+  gefunden“ – für Windows gelten deshalb die eigenen PowerShell-Befehle unten.
 
 ## Installation
 
@@ -55,15 +57,40 @@ cd s3-uploader
 
 Eine virtuelle Umgebung hält die Zusatzmodule vom System-Python getrennt.
 
+**macOS und Linux** (Terminal):
+
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 python -m pip install --upgrade pip
 ```
 
+**Windows** (PowerShell):
+
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+```
+
+Nach der Aktivierung steht `(.venv)` vor der Eingabeaufforderung; ab dann gilt `python`
+bzw. `pip` für die virtuelle Umgebung, auf allen Systemen gleich.
+
+Meldet PowerShell beim Aktivieren „Die Ausführung von Skripts ist auf diesem System
+deaktiviert“, gibt es zwei Wege:
+
+- ohne Aktivierung arbeiten und die Programme der Umgebung direkt aufrufen:
+  `.venv\Scripts\python.exe -m pip …` und `.venv\Scripts\s3-uploader.exe …`, oder
+- Skripte nur für das aktuelle Fenster erlauben:
+  `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
+  (gilt nur bis zum Schließen des Fensters; dauerhafte Änderungen nur in Absprache mit der IT).
+
+In der Windows-Eingabeaufforderung (cmd.exe) statt PowerShell lautet die Aktivierung
+`.venv\Scripts\activate.bat`.
+
 Die Aktivierung gilt nur für das aktuelle Terminal. In jedem neuen Terminal erneut
-`source .venv/bin/activate` ausführen (oder das Programm direkt als
-`.venv/bin/s3-uploader` aufrufen).
+aktivieren oder das Programm direkt aufrufen: `.venv/bin/s3-uploader` (macOS/Linux) bzw.
+`.venv\Scripts\s3-uploader.exe` (Windows).
 
 ### 3. Zusatzmodule installieren
 
@@ -146,6 +173,15 @@ Alle Angaben gehen als Parameter **oder** als Umgebungsvariable:
 > Prozesslisting (`ps`) und im Shell-Verlauf sichtbar. Das Passwort besser per
 > Umgebungsvariable oder verdeckter Eingabe übergeben. Zugangsdaten werden nie in die
 > Zustandsdatei oder ins Protokoll geschrieben.
+
+Die Beispiele unten sind für macOS/Linux geschrieben. In der Windows-PowerShell:
+
+| macOS/Linux | Windows-PowerShell |
+|---|---|
+| `export S3_SECRET_KEY='…'` | `$env:S3_SECRET_KEY = '…'` |
+| Zeilenfortsetzung mit `\` am Zeilenende | Zeilenfortsetzung mit `` ` `` (Backtick) am Zeilenende |
+| `--quelle /daten/export` | `--quelle D:\daten\export` |
+| Zustandsdateien unter `~/.s3-uploader/` | unter `%USERPROFILE%\.s3-uploader\` |
 
 ### Verbindungstest
 

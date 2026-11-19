@@ -3,6 +3,12 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Geändert
+- README: eigene Installationsbefehle für Windows-PowerShell (`py`, `Activate.ps1`,
+  Ausführungsrichtlinie, Aufruf ohne Aktivierung) und PowerShell-Entsprechungen der Beispiele.
+
 ## [0.2.0] – 2026-11-19
 
 ### Hinzugefügt
