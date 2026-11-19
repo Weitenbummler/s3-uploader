@@ -330,6 +330,29 @@ pytest --cov=s3_uploader        # mit Abdeckung
 
 ---
 
+## 8a. Ein Programm für Windows, macOS und Linux
+
+Python läuft überall – aber nicht überall gleich. Drei Stellen in s3-uploader zeigen typische
+Unterschiede:
+
+1. **Warten unterbrechen.** `concurrent.futures.as_completed()` wartet ohne Zeitgrenze.
+   Unter Windows kann Strg+C ein solches Warten nicht unterbrechen. `_fertige_auftraege`
+   in `uploader.py` wartet deshalb höchstens 0,5 s am Stück und gibt Python so die
+   Gelegenheit, den Abbruch zu bemerken.
+2. **Pfade vergleichen.** Windows unterscheidet nicht zwischen `D:\Daten` und `d:/daten`.
+   `os.path.normcase` gleicht das an (unter macOS/Linux ändert es nichts), siehe
+   `quellkennung` in `konfiguration.py`.
+3. **Die Konsole.** Die klassische Windows-Konsole versteht Steuerzeichen wie `\033[K` erst
+   nach einem Systemaufruf (`SetConsoleMode`). `terminal.py` versucht das per `ctypes` und
+   überschreibt die Zeile sonst mit Leerzeichen. Die Prüfung `if sys.platform != "win32"`
+   sorgt dafür, dass `mypy` den Windows-Teil nur für Windows prüft.
+
+> **Übung 8a:** Führe `mypy --platform win32 src` aus. Was ändert sich gegenüber `mypy src`?
+> (Lösung: nichts bei den Ergebnissen – aber jetzt wird der Windows-Zweig in `terminal.py`
+> geprüft, vorher der andere.)
+
+---
+
 ## 9. Glossar
 
 | Begriff | Bedeutung |

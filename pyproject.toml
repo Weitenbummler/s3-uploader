@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "s3-uploader"
-version = "0.2.0"
+version = "0.2.1"
 description = "Wiederaufsetzbares Hochladen vieler und großer Dateien in einen S3-Bucket"
 readme = "README.md"
 license = "MIT"

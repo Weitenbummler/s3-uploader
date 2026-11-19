@@ -119,8 +119,20 @@ pip install -r requirements-dev.txt
 pip install -e .
 ```
 
+Beide Zeilen sind nötig: Die erste installiert die Zusatzmodule, erst die zweite
+installiert s3-uploader selbst und legt den Befehl `s3-uploader` an (unter Windows
+`.venv\Scripts\s3-uploader.exe`). Fehlt sie, meldet PowerShell „Der Begriff
+„s3-uploader“ wird nicht … erkannt“.
+
 `pyproject.toml` liest die Laufzeit-Abhängigkeiten direkt aus `requirements.txt`; sie
 stehen also nur an einer Stelle.
+
+> **Windows mit Python 3.15:** Der Betrieb (`requirements.txt`) funktioniert. Für die
+> Entwicklungswerkzeuge (`requirements-dev.txt`) braucht das Testwerkzeug `moto` das Paket
+> PyYAML, für das es unter Windows noch kein fertiges Paket für Python 3.15 gibt; pip
+> versucht es dann zu übersetzen und verlangt die „Microsoft C++ Build Tools“. Für die
+> Entwicklung unter Windows deshalb Python 3.13 oder 3.14 verwenden
+> (`py -3.14 -m venv .venv`) oder die Build Tools installieren.
 
 ### 4. Installation prüfen
 
@@ -130,6 +142,23 @@ s3-uploader --help
 ```
 
 Alternativ ohne Einstiegspunkt: `python -m s3_uploader --help`.
+
+### Hinweise für Windows
+
+- Getestet unter Windows 11 mit Python 3.15 und PowerShell 5.1: alle Tests, Verbindungstest,
+  Hochladen, Fortsetzen, Abbruch per Strg+C, `--ohne-teilung`, Pfade mit Leerzeichen und
+  Umlauten.
+- Für die Fortschrittszeile in der klassischen Konsole schaltet s3-uploader die
+  Verarbeitung von Steuerzeichen selbst ein; gelingt das nicht, überschreibt es die Zeile
+  mit Leerzeichen. Windows Terminal versteht die Steuerzeichen ohnehin.
+- Pfade in Anführungszeichen nicht mit `\` beenden: `--quelle "D:\Daten\"` wird von
+  Windows als `D:\Daten"` gelesen. Richtig: `--quelle "D:\Daten"` oder `--quelle D:\Daten`.
+- Groß-/Kleinschreibung und `/` oder `\` im Quellpfad spielen keine Rolle: `D:\Daten` und
+  `d:/daten` finden dieselbe Zustandsdatei.
+- Dateien, die gerade von einem anderen Programm gesperrt sind (z. B. eine in Excel
+  geöffnete Tabelle), schlagen einzeln fehl und werden beim nächsten Aufruf erneut versucht.
+- Sehr lange Pfade (über 260 Zeichen) brauchen die Windows-Einstellung
+  „Lange Pfade aktivieren“ (`LongPathsEnabled`).
 
 ### Ohne Netz installieren (Offline-Rechner)
 

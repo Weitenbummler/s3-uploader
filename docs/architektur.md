@@ -15,6 +15,7 @@ Die Diagramme sind in Mermaid geschrieben und werden von Gitea direkt dargestell
 | `uploader.py` | Kern: einfacher Upload, Multipart, Fortsetzen, Parallelität |
 | `zustand.py` | SQLite-Zustandsdatei für das Wiederaufsetzen |
 | `fortschritt.py` | Threadsichere Zählung, Fortschrittszeile, logging-Handler |
+| `terminal.py` | Betriebssystemunabhängige Terminal-Ausgabe (Windows-Konsole, Kodierung, Zeilenbreite) |
 | `fehler.py` | Ausnahmehierarchie |
 
 ## Paketabhängigkeiten
@@ -28,6 +29,8 @@ flowchart TD
     cli --> uploader
     cli --> zustand
     cli --> fortschritt
+    fortschritt --> terminal
+    cli --> terminal
     uploader --> planung
     uploader --> zustand
     uploader --> fortschritt
@@ -288,4 +291,6 @@ erDiagram
 | `Content-MD5` statt boto3-Standardprüfsummen | Wird von praktisch allen S3-kompatiblen Speichern verstanden |
 | Teilung abschaltbar (`--ohne-teilung`) | Manche S3-kompatible Speicher unterstützen Multipart nur eingeschränkt; einzelne Uploads liefern einen MD5-ETag |
 | Einzelne Uploads gestreamt | Ohne Teilung sind Dateien bis 5 GiB möglich; sie sollen nicht vollständig im Speicher liegen |
+| Warten mit Zeitgrenze statt `as_completed` | Unter Windows unterbricht Strg+C ein Warten ohne Zeitgrenze nicht; mit 0,5 s Zeitgrenze reagiert der Abbruch sofort |
+| Quellpfad mit `os.path.normcase` vereinheitlicht | Unter Windows sind `D:\Daten` und `d:/daten` derselbe Ordner und müssen dieselbe Zustandsdatei finden |
 | Threads statt asyncio | Ein-/Ausgabe-lastig, boto3 ist synchron; Threads sind hier einfach und ausreichend |

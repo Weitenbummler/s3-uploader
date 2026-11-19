@@ -3,9 +3,19 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unveröffentlicht]
+## [0.2.1] – 2026-11-19
+
+### Behoben
+- Windows: Strg+C bricht einen Lauf sofort ab, statt bis zum Ende der aktuellen Datei zu warten.
+- Windows: Fortschrittszeile in der klassischen Konsole (Steuerzeichen werden eingeschaltet,
+  sonst wird mit Leerzeichen überschrieben); Zeile wird auf die Fensterbreite gekürzt.
+- Windows: Quellpfade in anderer Schreibweise (`d:/daten` statt `D:\Daten`) finden dieselbe
+  Zustandsdatei.
+- Nicht darstellbare Zeichen in der Ausgabe führen nicht mehr zum Absturz.
+- Test für symbolische Links wird übersprungen, wenn das System keine Links erlaubt.
 
 ### Geändert
+- README: Hinweise für Windows, Pflicht von `pip install .`, Python 3.15 und Entwicklungswerkzeuge.
 - README: eigene Installationsbefehle für Windows-PowerShell (`py`, `Activate.ps1`,
   Ausführungsrichtlinie, Aufruf ohne Aktivierung) und PowerShell-Entsprechungen der Beispiele.
 - README: Windows-Pfade mit `.\` davor, sonst deutet PowerShell `.venv\…` als Modulnamen.
