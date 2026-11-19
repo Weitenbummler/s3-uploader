@@ -69,7 +69,7 @@ python -m pip install --upgrade pip
 
 ```powershell
 py -m venv .venv
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 ```
 
@@ -84,17 +84,17 @@ Meldet PowerShell beim Aktivieren „Die Ausführung von Skripts ist auf diesem 
 deaktiviert“, gibt es zwei Wege:
 
 - ohne Aktivierung arbeiten und die Programme der Umgebung direkt aufrufen:
-  `.venv\Scripts\python.exe -m pip …` und `.venv\Scripts\s3-uploader.exe …`, oder
+  `.\.venv\Scripts\python.exe -m pip …` und `.\.venv\Scripts\s3-uploader.exe …`, oder
 - Skripte nur für das aktuelle Fenster erlauben:
   `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
   (gilt nur bis zum Schließen des Fensters; dauerhafte Änderungen nur in Absprache mit der IT).
 
 In der Windows-Eingabeaufforderung (cmd.exe) statt PowerShell lautet die Aktivierung
-`.venv\Scripts\activate.bat`.
+`.\.venv\Scripts\activate.bat`.
 
 Die Aktivierung gilt nur für das aktuelle Terminal. In jedem neuen Terminal erneut
 aktivieren oder das Programm direkt aufrufen: `.venv/bin/s3-uploader` (macOS/Linux) bzw.
-`.venv\Scripts\s3-uploader.exe` (Windows).
+`.\.venv\Scripts\s3-uploader.exe` (Windows).
 
 ### 3. Zusatzmodule installieren
 
