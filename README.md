@@ -25,173 +25,557 @@ Lizenz: [MIT](LICENSE). Entwickelt nach den (intern gepflegten) python-richtlini
 - **Integrität**: Jeder Upload sendet `Content-MD5`; der Server weist verfälschte Daten ab.
   Dateien, die sich während des Uploads ändern, werden erkannt und nicht halb übernommen.
 
-## Voraussetzungen
+## Einrichtung und Start – Betriebssystem wählen
 
-| Was | Version | Prüfen mit |
+Die Abschnitte sind jeweils vollständig. Lies nur den für dein System:
+
+| Betriebssystem | Kommandozeile | Abschnitt |
 |---|---|---|
-| Python | 3.11 oder neuer | `python3 --version` |
-| pip und venv | mit Python geliefert | `python3 -m pip --version` |
-| git | beliebig | `git --version` |
-| Netzwerkzugang zum S3-Endpunkt | – | `s3-uploader test …` |
+| Windows 10/11 | PowerShell | [Windows](#windows) |
+| macOS | Terminal (zsh) | [macOS](#macos) |
+| Linux (Debian, Ubuntu, Fedora, RHEL …) | Terminal (bash) | [Linux](#linux) |
 
-Python installieren, falls nötig:
+Alles danach ([Parameter](#parameter-und-umgebungsvariablen), [Optionen](#optionen-von-hochladen),
+[Exit-Codes](#exit-codes) …) gilt für alle Systeme gleich.
 
-- **macOS** (Homebrew): `brew install python@3.12`
-- **Debian/Ubuntu**: `sudo apt install python3 python3-venv python3-pip`
-- **RHEL/Fedora**: `sudo dnf install python3 python3-pip`
-- **Windows**: Installer von <https://www.python.org/downloads/> (bzw. „Python Install
-  Manager“). Danach steht der Starter `py` zur Verfügung. `python3` und oft auch `python`
-  sind unter Windows nur Verknüpfungen zum Microsoft Store und melden „Python wurde nicht
-  gefunden“ – für Windows gelten deshalb die eigenen PowerShell-Befehle unten.
+Gemeinsame Voraussetzung: **Python 3.11 oder neuer** und Netzwerkzugang zum S3-Endpunkt.
 
-## Installation
+---
 
-### 1. Quellcode holen
+## Windows
 
-```bash
+Alle Befehle in **PowerShell** (Startmenü → „PowerShell“). Befehle, die mit `.\` beginnen,
+genau so eingeben – ohne `.\` findet PowerShell Programme im aktuellen Ordner nicht.
+
+### W1. Python installieren
+
+1. Installer von <https://www.python.org/downloads/windows/> herunterladen und ausführen.
+2. Im ersten Fenster **„Add python.exe to PATH“** anhaken, dann „Install Now“.
+3. Neues PowerShell-Fenster öffnen und prüfen:
+
+```powershell
+py --version
+```
+
+Unter Windows heißt der Python-Starter `py`. Die Befehle `python3` und anfangs oft auch
+`python` sind nur Verknüpfungen zum Microsoft Store und melden „Python wurde nicht
+gefunden“ – deshalb in den nächsten Schritten immer `py` verwenden, bis die virtuelle
+Umgebung aktiv ist.
+
+### W2. Quellcode holen
+
+Mit git (falls installiert):
+
+```powershell
 git clone https://github.com/Weitenbummler/s3-uploader.git
+```
+
+```powershell
 cd s3-uploader
 ```
 
-### 2. Virtuelle Umgebung anlegen und aktivieren
+Ohne git: auf <https://github.com/Weitenbummler/s3-uploader> „Code → Download ZIP“, ZIP
+entpacken (z. B. nach `D:\Entwicklung\s3-uploader`) und in PowerShell dorthin wechseln:
+`cd D:\Entwicklung\s3-uploader`.
 
-Eine virtuelle Umgebung hält die Zusatzmodule vom System-Python getrennt.
-
-**macOS und Linux** (Terminal):
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-```
-
-**Windows** (PowerShell):
+### W3. Virtuelle Umgebung anlegen und aktivieren
 
 ```powershell
 py -m venv .venv
+```
+
+Windows sperrt in PowerShell standardmäßig das Ausführen von Skripten, auch das
+Aktivierungsskript der Umgebung („… kann nicht geladen werden, da die Ausführung von
+Skripts auf diesem System deaktiviert ist“). Deshalb zuerst Skripte **nur für dieses
+Fenster** erlauben – das ändert keine Systemeinstellung und gilt bis zum Schließen des
+Fensters:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+```
+
+Dann die Umgebung aktivieren:
+
+```powershell
 .\.venv\Scripts\Activate.ps1
+```
+
+Danach steht `(.venv)` vor der Eingabeaufforderung. Ab jetzt gelten `python` und `pip`
+für die virtuelle Umgebung.
+
+Darf `Set-ExecutionPolicy` nicht verwendet werden (z. B. durch eine Firmenrichtlinie),
+geht es ohne Aktivierung: In allen folgenden Schritten `python` durch
+`.\.venv\Scripts\python.exe`, `pip` durch `.\.venv\Scripts\pip.exe` und `s3-uploader`
+durch `.\.venv\Scripts\s3-uploader.exe` ersetzen. (In der alten Eingabeaufforderung
+`cmd.exe` lautet die Aktivierung `.venv\Scripts\activate.bat`; dort gibt es die Sperre nicht.)
+
+### W4. s3-uploader installieren
+
+```powershell
 python -m pip install --upgrade pip
 ```
 
-Wichtig in PowerShell: Pfade zu Programmen im aktuellen Verzeichnis beginnen mit `.\`.
-Ohne diesen Vorsatz liest PowerShell `.venv\…` als „Modul .venv, Befehl …“ und meldet
-„Das Modul „.venv“ konnte nicht geladen werden“.
-
-Nach der Aktivierung steht `(.venv)` vor der Eingabeaufforderung; ab dann gilt `python`
-bzw. `pip` für die virtuelle Umgebung, auf allen Systemen gleich.
-
-Meldet PowerShell beim Aktivieren „Die Ausführung von Skripts ist auf diesem System
-deaktiviert“, gibt es zwei Wege:
-
-- ohne Aktivierung arbeiten und die Programme der Umgebung direkt aufrufen:
-  `.\.venv\Scripts\python.exe -m pip …` und `.\.venv\Scripts\s3-uploader.exe …`, oder
-- Skripte nur für das aktuelle Fenster erlauben:
-  `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned`
-  (gilt nur bis zum Schließen des Fensters; dauerhafte Änderungen nur in Absprache mit der IT).
-
-In der Windows-Eingabeaufforderung (cmd.exe) statt PowerShell lautet die Aktivierung
-`.\.venv\Scripts\activate.bat`.
-
-Die Aktivierung gilt nur für das aktuelle Terminal. In jedem neuen Terminal erneut
-aktivieren oder das Programm direkt aufrufen: `.venv/bin/s3-uploader` (macOS/Linux) bzw.
-`.\.venv\Scripts\s3-uploader.exe` (Windows).
-
-### 3. Zusatzmodule installieren
-
-Die Zusatzmodule stehen in zwei requirements-Dateien:
-
-| Datei | Inhalt | Wofür |
-|---|---|---|
-| [`requirements.txt`](requirements.txt) | `boto3` (AWS SDK, Apache-2.0) | Betrieb – immer nötig |
-| [`requirements-dev.txt`](requirements-dev.txt) | zusätzlich `pytest`, `pytest-cov`, `moto`, `ruff`, `mypy` | Entwicklung und Tests |
-
-**Nur benutzen:**
-
-```bash
+```powershell
 pip install -r requirements.txt
+```
+
+```powershell
 pip install .
 ```
 
-**Entwickeln** (Programm editierbar installieren, Änderungen am Code wirken sofort):
+Alle drei Befehle sind nötig. `requirements.txt` installiert nur die Zusatzmodule; erst
+`pip install .` installiert s3-uploader selbst und legt den Befehl `s3-uploader` an.
 
-```bash
+### W5. Installation prüfen
+
+```powershell
+s3-uploader --version
+```
+
+Meldet PowerShell „Der Begriff „s3-uploader“ wird nicht … erkannt“: Ist `(.venv)` nicht
+zu sehen, Schritt W3 (Freigabe und Aktivierung) wiederholen; sonst fehlt `pip install .`
+aus W4.
+
+### W6. Starten
+
+Passwort: Am sichersten gar nicht angeben – dann fragt s3-uploader beim Start verdeckt
+danach. Für mehrere Aufrufe hintereinander kann es für dieses Fenster gesetzt werden (die
+Zeile landet allerdings im PowerShell-Verlauf):
+
+```powershell
+$env:S3_SECRET_KEY = 'DEIN-SECRET-KEY'
+```
+
+Verbindung testen – lange Befehle mit `` ` `` (Backtick) am Zeilenende umbrechen:
+
+```powershell
+s3-uploader test --endpunkt https://s3.example.org --bucket archiv `
+  --access-key MEINKEY --prefix backup/2026 --schreibtest
+```
+
+Hochladen:
+
+```powershell
+s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv `
+  --access-key MEINKEY --prefix backup/2026 --quelle D:\Daten\Export
+```
+
+Nach einem Abbruch denselben Befehl noch einmal ausführen – der Lauf wird fortgesetzt.
+
+### W7. In einem neuen PowerShell-Fenster
+
+Freigabe, Aktivierung und `$env:S3_SECRET_KEY` gelten nur im jeweiligen Fenster. Später also:
+
+```powershell
+cd D:\Entwicklung\s3-uploader
+```
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+```
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Ohne Aktivierung geht es auch direkt: `.\.venv\Scripts\s3-uploader.exe hochladen …`
+(aus dem Projektordner heraus).
+
+### W8. Aktualisieren und Deinstallieren
+
+Aktualisieren (im Projektordner, Umgebung aktiv):
+
+```powershell
+git pull
+```
+
+```powershell
+pip install -r requirements.txt
+```
+
+```powershell
+pip install .
+```
+
+Wurde der Quellcode als ZIP geholt: neues ZIP über den alten Ordner entpacken (`.venv`
+bleibt erhalten), dann die beiden `pip`-Befehle.
+
+Deinstallieren: den Projektordner löschen (er enthält auch `.venv`) und die Zustandsdateien
+unter `%USERPROFILE%\.s3-uploader\` (z. B. `C:\Users\Name\.s3-uploader\`).
+
+### W9. Ohne Internet installieren
+
+Auf einem Rechner mit Internet, gleiche Windows- und Python-Version, im Projektordner:
+
+```powershell
+pip download -r requirements.txt -d pakete
+```
+
+Projektordner samt `pakete` auf den Zielrechner kopieren, dort nach W3:
+
+```powershell
+pip install --no-index --find-links pakete -r requirements.txt
+```
+
+```powershell
+pip install --no-index --find-links pakete .
+```
+
+### W10. Entwickeln und Testen
+
+```powershell
 pip install -r requirements-dev.txt
+```
+
+```powershell
 pip install -e .
 ```
 
-Beide Zeilen sind nötig: Die erste installiert die Zusatzmodule, erst die zweite
-installiert s3-uploader selbst und legt den Befehl `s3-uploader` an (unter Windows
-`.venv\Scripts\s3-uploader.exe`). Fehlt sie, meldet PowerShell „Der Begriff
-„s3-uploader“ wird nicht … erkannt“.
-
-`pyproject.toml` liest die Laufzeit-Abhängigkeiten direkt aus `requirements.txt`; sie
-stehen also nur an einer Stelle.
-
-> **Windows mit Python 3.15:** Der Betrieb (`requirements.txt`) funktioniert. Für die
-> Entwicklungswerkzeuge (`requirements-dev.txt`) braucht das Testwerkzeug `moto` das Paket
-> PyYAML, für das es unter Windows noch kein fertiges Paket für Python 3.15 gibt; pip
-> versucht es dann zu übersetzen und verlangt die „Microsoft C++ Build Tools“. Für die
-> Entwicklung unter Windows deshalb Python 3.13 oder 3.14 verwenden
-> (`py -3.14 -m venv .venv`) oder die Build Tools installieren.
-
-### 4. Installation prüfen
-
-```bash
-s3-uploader --version
-s3-uploader --help
+```powershell
+pytest --cov=s3_uploader
 ```
 
-Alternativ ohne Einstiegspunkt: `python -m s3_uploader --help`.
+```powershell
+ruff check .
+```
 
-### Hinweise für Windows
+```powershell
+mypy src
+```
 
-- Getestet unter Windows 11 mit Python 3.15 und PowerShell 5.1: alle Tests, Verbindungstest,
-  Hochladen, Fortsetzen, Abbruch per Strg+C, `--ohne-teilung`, Pfade mit Leerzeichen und
-  Umlauten.
+Mit **Python 3.15** scheitert `requirements-dev.txt` derzeit: Das Testwerkzeug `moto`
+braucht PyYAML, für das es unter Windows noch kein fertiges Paket für 3.15 gibt, und pip
+verlangt dann die „Microsoft C++ Build Tools“. Zum Entwickeln deshalb Python 3.13 oder
+3.14 zusätzlich installieren und die Umgebung damit anlegen: `py -3.14 -m venv .venv`.
+Für den reinen Betrieb (W4) ist 3.15 kein Problem.
+
+### W11. Hinweise für Windows
+
+- Getestet unter Windows 11 mit Python 3.15 und PowerShell 5.1: alle Tests,
+  Verbindungstest, Hochladen, Fortsetzen, Abbruch per Strg+C, `--ohne-teilung`, Pfade mit
+  Leerzeichen und Umlauten.
+- Pfade in Anführungszeichen nicht mit `\` beenden: `--quelle "D:\Daten\"` wird als
+  `D:\Daten"` gelesen. Richtig: `--quelle "D:\Daten"` oder `--quelle D:\Daten`.
+- Groß-/Kleinschreibung und `/` oder `\` im Quellpfad spielen keine Rolle: `D:\Daten` und
+  `d:/daten` finden dieselbe Zustandsdatei.
 - Für die Fortschrittszeile in der klassischen Konsole schaltet s3-uploader die
   Verarbeitung von Steuerzeichen selbst ein; gelingt das nicht, überschreibt es die Zeile
   mit Leerzeichen. Windows Terminal versteht die Steuerzeichen ohnehin.
-- Pfade in Anführungszeichen nicht mit `\` beenden: `--quelle "D:\Daten\"` wird von
-  Windows als `D:\Daten"` gelesen. Richtig: `--quelle "D:\Daten"` oder `--quelle D:\Daten`.
-- Groß-/Kleinschreibung und `/` oder `\` im Quellpfad spielen keine Rolle: `D:\Daten` und
-  `d:/daten` finden dieselbe Zustandsdatei.
-- Dateien, die gerade von einem anderen Programm gesperrt sind (z. B. eine in Excel
-  geöffnete Tabelle), schlagen einzeln fehl und werden beim nächsten Aufruf erneut versucht.
-- Sehr lange Pfade (über 260 Zeichen) brauchen die Windows-Einstellung
-  „Lange Pfade aktivieren“ (`LongPathsEnabled`).
+- Von einem anderen Programm gesperrte Dateien (z. B. in Excel geöffnet) schlagen einzeln
+  fehl und werden beim nächsten Aufruf erneut versucht.
+- Pfade über 260 Zeichen brauchen die Windows-Einstellung „Lange Pfade aktivieren“
+  (`LongPathsEnabled`).
 
-### Ohne Netz installieren (Offline-Rechner)
+---
 
-Auf einem Rechner mit Internet die Pakete herunterladen, Verzeichnis kopieren, dann
-offline installieren:
+## macOS
+
+Alle Befehle im **Terminal** (Programme → Dienstprogramme → Terminal).
+
+### M1. Python installieren
+
+Prüfen, ob ein ausreichend neues Python vorhanden ist (3.11 oder neuer):
 
 ```bash
-pip download -r requirements.txt -d pakete/
+python3 --version
+```
+
+Das von Apple mitgelieferte Python ist oft 3.9 und damit zu alt. Neueres Python mit
+[Homebrew](https://brew.sh):
+
+```bash
+brew install python@3.13
+```
+
+Danach heißt der Befehl `python3.13`. Wo unten `python3` steht, dann `python3.13`
+verwenden. Alternativ den Installer von <https://www.python.org/downloads/macos/>.
+
+### M2. Quellcode holen
+
+```bash
+git clone https://github.com/Weitenbummler/s3-uploader.git
 ```
 
 ```bash
-pip install --no-index --find-links pakete/ -r requirements.txt
-pip install --no-index --find-links pakete/ .
+cd s3-uploader
 ```
 
-### Aktualisieren und Deinstallieren
+Fehlt git, bietet macOS beim ersten Aufruf die „Command Line Tools“ an. Ohne git: auf
+GitHub „Code → Download ZIP“, entpacken und mit `cd` in den Ordner wechseln.
+
+### M3. Virtuelle Umgebung anlegen und aktivieren
+
+```bash
+python3 -m venv .venv
+```
+
+```bash
+source .venv/bin/activate
+```
+
+Danach steht `(.venv)` vor der Eingabeaufforderung. Ab jetzt gelten `python` und `pip`
+für die virtuelle Umgebung.
+
+### M4. s3-uploader installieren
+
+```bash
+python -m pip install --upgrade pip
+```
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+pip install .
+```
+
+Alle drei Befehle sind nötig. `requirements.txt` installiert nur die Zusatzmodule; erst
+`pip install .` installiert s3-uploader selbst und legt den Befehl `s3-uploader` an.
+
+### M5. Installation prüfen
+
+```bash
+s3-uploader --version
+```
+
+Meldet das Terminal `command not found`: Ist `(.venv)` nicht zu sehen, Schritt M3
+wiederholen; sonst fehlt `pip install .` aus M4.
+
+### M6. Starten
+
+Passwort: Am sichersten gar nicht angeben – dann fragt s3-uploader beim Start verdeckt
+danach. Für mehrere Aufrufe hintereinander kann es für dieses Fenster gesetzt werden (die
+Zeile landet allerdings im Shell-Verlauf):
+
+```bash
+export S3_SECRET_KEY='DEIN-SECRET-KEY'
+```
+
+Verbindung testen – lange Befehle mit `\` am Zeilenende umbrechen:
+
+```bash
+s3-uploader test --endpunkt https://s3.example.org --bucket archiv \
+  --access-key MEINKEY --prefix backup/2026 --schreibtest
+```
+
+Hochladen:
+
+```bash
+s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv \
+  --access-key MEINKEY --prefix backup/2026 --quelle ~/Daten/Export
+```
+
+Nach einem Abbruch denselben Befehl noch einmal ausführen – der Lauf wird fortgesetzt.
+
+### M7. In einem neuen Terminalfenster
+
+```bash
+cd ~/Pfad/zu/s3-uploader
+```
+
+```bash
+source .venv/bin/activate
+```
+
+Ohne Aktivierung geht es auch direkt: `.venv/bin/s3-uploader hochladen …`.
+
+### M8. Aktualisieren und Deinstallieren
 
 ```bash
 git pull && pip install -r requirements.txt && pip install .
 ```
 
+Deinstallieren: Projektordner löschen (enthält `.venv`) und die Zustandsdateien entfernen:
+`rm -r ~/.s3-uploader`.
+
+### M9. Ohne Internet installieren
+
+Auf einem Mac mit Internet (gleiche macOS- und Python-Version), im Projektordner:
+
 ```bash
-pip uninstall s3-uploader
+pip download -r requirements.txt -d pakete
 ```
 
-Zum vollständigen Entfernen zusätzlich das Verzeichnis `.venv/` und die Zustandsdateien
-unter `~/.s3-uploader/` löschen.
+Projektordner samt `pakete` kopieren, auf dem Zielrechner nach M3:
 
-## Bedienung
+```bash
+pip install --no-index --find-links pakete -r requirements.txt && pip install --no-index --find-links pakete .
+```
 
-### Zugangsdaten übergeben
+### M10. Entwickeln und Testen
 
-Alle Angaben gehen als Parameter **oder** als Umgebungsvariable:
+```bash
+pip install -r requirements-dev.txt && pip install -e .
+```
+
+```bash
+ruff format --check . && ruff check . && mypy src && pytest --cov=s3_uploader
+```
+
+### M11. Hinweise für macOS
+
+- Ein laufender Upload hält den Mac nicht wach. Für lange Läufe den Befehl mit
+  `caffeinate -i` davor starten: `caffeinate -i s3-uploader hochladen …`.
+- Quellordner in „Dokumente“, „Schreibtisch“ oder auf externen Laufwerken brauchen ggf. die
+  Freigabe für das Terminal (Systemeinstellungen → Datenschutz & Sicherheit →
+  Festplattenvollzugriff).
+- Finder-Hilfsdateien wie `.DS_Store` lassen sich mit `--ausschliessen '*.DS_Store'`
+  auslassen.
+
+---
+
+## Linux
+
+Alle Befehle im **Terminal** (bash).
+
+### L1. Python installieren
+
+Prüfen (3.11 oder neuer nötig):
+
+```bash
+python3 --version
+```
+
+Fehlt Python oder `venv`:
+
+- **Debian 12 / Ubuntu 24.04 und neuer:** `sudo apt install python3 python3-venv python3-pip git`
+- **Fedora:** `sudo dnf install python3 python3-pip git`
+- **RHEL / Rocky / Alma 9:** Das Standard-Python ist 3.9. Stattdessen
+  `sudo dnf install python3.11 python3.11-pip git` und unten `python3.11` statt `python3`.
+- **Ubuntu 22.04:** Das Standard-Python ist 3.10. Stattdessen
+  `sudo apt install python3.11 python3.11-venv` und unten `python3.11` statt `python3`.
+
+### L2. Quellcode holen
+
+```bash
+git clone https://github.com/Weitenbummler/s3-uploader.git
+```
+
+```bash
+cd s3-uploader
+```
+
+### L3. Virtuelle Umgebung anlegen und aktivieren
+
+```bash
+python3 -m venv .venv
+```
+
+```bash
+source .venv/bin/activate
+```
+
+Danach steht `(.venv)` vor der Eingabeaufforderung. Meldet `venv` „ensurepip is not
+available“, fehlt das Paket `python3-venv` (siehe L1).
+
+### L4. s3-uploader installieren
+
+```bash
+python -m pip install --upgrade pip
+```
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+pip install .
+```
+
+Alle drei Befehle sind nötig. `requirements.txt` installiert nur die Zusatzmodule; erst
+`pip install .` installiert s3-uploader selbst und legt den Befehl `s3-uploader` an.
+
+### L5. Installation prüfen
+
+```bash
+s3-uploader --version
+```
+
+Bei `command not found`: Ist `(.venv)` nicht zu sehen, L3 wiederholen; sonst fehlt
+`pip install .` aus L4.
+
+### L6. Starten
+
+Passwort: Am sichersten gar nicht angeben – dann fragt s3-uploader beim Start verdeckt
+danach. Für mehrere Aufrufe hintereinander kann es gesetzt werden (die Zeile landet
+allerdings im Shell-Verlauf; mit einem Leerzeichen am Zeilenanfang meist nicht):
+
+```bash
+export S3_SECRET_KEY='DEIN-SECRET-KEY'
+```
+
+Verbindung testen – lange Befehle mit `\` am Zeilenende umbrechen:
+
+```bash
+s3-uploader test --endpunkt https://s3.example.org --bucket archiv \
+  --access-key MEINKEY --prefix backup/2026 --schreibtest
+```
+
+Hochladen:
+
+```bash
+s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv \
+  --access-key MEINKEY --prefix backup/2026 --quelle /daten/export
+```
+
+Nach einem Abbruch denselben Befehl noch einmal ausführen – der Lauf wird fortgesetzt.
+
+### L7. In einem neuen Terminal
+
+```bash
+cd /pfad/zu/s3-uploader && source .venv/bin/activate
+```
+
+Ohne Aktivierung, z. B. in Cron-Jobs oder systemd-Units, das Programm mit vollem Pfad
+aufrufen: `/pfad/zu/s3-uploader/.venv/bin/s3-uploader hochladen …`.
+
+### L8. Aktualisieren und Deinstallieren
+
+```bash
+git pull && pip install -r requirements.txt && pip install .
+```
+
+Deinstallieren: Projektordner löschen und `rm -r ~/.s3-uploader`.
+
+### L9. Ohne Internet installieren
+
+Auf einem Rechner mit Internet (gleiche Distribution und Python-Version), im Projektordner:
+
+```bash
+pip download -r requirements.txt -d pakete
+```
+
+Projektordner samt `pakete` kopieren, auf dem Zielrechner nach L3:
+
+```bash
+pip install --no-index --find-links pakete -r requirements.txt && pip install --no-index --find-links pakete .
+```
+
+### L10. Entwickeln und Testen
+
+```bash
+pip install -r requirements-dev.txt && pip install -e .
+```
+
+```bash
+ruff format --check . && ruff check . && mypy src && pytest --cov=s3_uploader
+```
+
+### L11. Hinweise für Linux
+
+- Lange Läufe auf Servern in `tmux` oder `screen` starten, damit sie das Abmelden
+  überstehen; oder mit `nohup … > upload.log 2>&1 &`. In eine Datei umgeleitet schreibt die
+  Fortschrittsanzeige alle 30 Sekunden eine eigene Zeile.
+- Für Cron/systemd das Passwort nicht in die Unit oder Crontab schreiben, sondern aus einer
+  nur für den Benutzer lesbaren Datei laden (`chmod 600`), z. B.
+  `EnvironmentFile=/etc/s3-uploader/zugang.env` mit `S3_SECRET_KEY=…`.
+
+---
+
+## Parameter und Umgebungsvariablen
+
+Für alle Systeme gleich. Alle Angaben gehen als Parameter **oder** als Umgebungsvariable:
 
 | Parameter | Umgebungsvariable | Bedeutung |
 |---|---|---|
@@ -202,29 +586,16 @@ Alle Angaben gehen als Parameter **oder** als Umgebungsvariable:
 | `--passwort` / `--secret-key` | `S3_SECRET_KEY` | Secret Key; fehlt er, wird verdeckt gefragt |
 | `--region` | `S3_REGION` | Region für die Signatur (Standard `us-east-1`) |
 
+Umgebungsvariable setzen: Windows `$env:NAME = 'wert'`, macOS/Linux `export NAME='wert'`.
+
 > **Sicherheitshinweis:** Parameter auf der Kommandozeile sind für andere Benutzer im
-> Prozesslisting (`ps`) und im Shell-Verlauf sichtbar. Das Passwort besser per
-> Umgebungsvariable oder verdeckter Eingabe übergeben. Zugangsdaten werden nie in die
-> Zustandsdatei oder ins Protokoll geschrieben.
+> Prozesslisting und im Shell-Verlauf sichtbar. Das Passwort besser per Umgebungsvariable
+> oder verdeckter Eingabe übergeben. Zugangsdaten werden nie in die Zustandsdatei oder ins
+> Protokoll geschrieben.
 
-Die Beispiele unten sind für macOS/Linux geschrieben. In der Windows-PowerShell:
+## Was die Befehle ausgeben
 
-| macOS/Linux | Windows-PowerShell |
-|---|---|
-| `export S3_SECRET_KEY='…'` | `$env:S3_SECRET_KEY = '…'` |
-| Zeilenfortsetzung mit `\` am Zeilenende | Zeilenfortsetzung mit `` ` `` (Backtick) am Zeilenende |
-| `--quelle /daten/export` | `--quelle D:\daten\export` |
-| Zustandsdateien unter `~/.s3-uploader/` | unter `%USERPROFILE%\.s3-uploader\` |
-
-### Verbindungstest
-
-```bash
-export S3_SECRET_KEY='…'
-s3-uploader test --endpunkt https://s3.example.org --bucket archiv \
-  --access-key MEINKEY --prefix backup/2026 --schreibtest
-```
-
-Ausgabe:
+Verbindungstest:
 
 ```text
 Teste https://s3.example.org – Bucket 'archiv', Präfix 'backup/2026/'
@@ -235,39 +606,29 @@ Teste https://s3.example.org – Bucket 'archiv', Präfix 'backup/2026/'
 Verbindungstest erfolgreich.
 ```
 
-### Hochladen
-
-```bash
-s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv \
-  --access-key MEINKEY --prefix backup/2026 --quelle /daten/export
-```
-
-Aus `/daten/export/projekt/a.pdf` wird das Objekt `backup/2026/projekt/a.pdf`.
+Hochladen (aus `<quelle>/projekt/a.pdf` wird das Objekt `backup/2026/projekt/a.pdf`):
 
 ```text
-Durchsuche /daten/export …
+Durchsuche …
 18342 Dateien (1,2 TiB), davon 0 bereits erledigt; offen: 18110 einfach, 232 in Teilen (1,2 TiB).
-Zustandsdatei: /home/nutzer/.s3-uploader/zustand-3f9c0a1b2d4e5f60.sqlite
+Zustandsdatei: …/.s3-uploader/zustand-3f9c0a1b2d4e5f60.sqlite
 [ 42,3 %] 7712/18342 Dateien | 519,4 GiB / 1,2 TiB | 98,6 MiB/s | Rest 2:05:11
 ```
 
-### Abgebrochenen Lauf fortsetzen
+## Abgebrochenen Lauf fortsetzen
 
-Denselben Befehl einfach noch einmal aufrufen. Die Zustandsdatei wird über Endpunkt,
-Bucket, Präfix und Quelle automatisch wiedergefunden. Strg+C beendet einen Lauf geordnet:
-laufende Teile werden noch fertig übertragen.
+Denselben Befehl einfach noch einmal aufrufen. Die Zustandsdatei (im Benutzerordner unter
+`.s3-uploader`) wird über Endpunkt, Bucket, Präfix und Quelle automatisch wiedergefunden.
+Strg+C beendet einen Lauf geordnet: laufende Teile werden noch fertig übertragen.
 
 Wurde die Zustandsdatei gelöscht, übernimmt `--pruefe-ziel` bereits vorhandene Objekte
 gleicher Größe, statt sie erneut zu übertragen.
 
-### Teilung großer Dateien ein- oder ausschalten
+## Teilung großer Dateien ein- oder ausschalten
 
 Standardmäßig werden Dateien über der Schwelle (`--schwelle`, Standard 64 MiB) in Teile
 zerlegt. Mit `--ohne-teilung` geht jede Datei als ein einziger Upload (`PutObject`):
-
-```bash
-s3-uploader hochladen … --quelle /daten/export --ohne-teilung
-```
+`s3-uploader hochladen … --ohne-teilung`.
 
 | | mit Teilung (Standard) | `--ohne-teilung` |
 |---|---|---|
@@ -285,10 +646,11 @@ die Fortschrittsanzeige bewegt sich auch während einer einzelnen großen Datei.
 Wird ein mit Teilung begonnener Lauf mit `--ohne-teilung` fortgesetzt, bricht das Programm
 angefangene Multipart-Uploads im Bucket ab und lädt die betroffenen Dateien neu hoch.
 
-### Weitere Optionen von `hochladen`
+## Optionen von `hochladen`
 
 | Option | Standard | Bedeutung |
 |---|---|---|
+| `--quelle PFAD` | – | Quellverzeichnis (Pflicht) |
 | `--ohne-teilung` | – | Keine Teilung: jede Datei als ein Upload (max. 5 GiB) |
 | `--schwelle` | `64MiB` | Ab dieser Größe Multipart (5 MiB – 5 GiB) |
 | `--teilgroesse` | `16MiB` | Gewünschte Teilgröße (min. 5 MiB, wächst bei Bedarf) |
@@ -304,10 +666,12 @@ angefangene Multipart-Uploads im Bucket ab und lädt die betroffenen Dateien neu
 | `--ohne-tls-pruefung` | – | Zertifikat nicht prüfen (nur Testsysteme) |
 | `-v`, `-vv` | – | Mehr Meldungen |
 
+Alle Optionen mit Erklärung: `s3-uploader hochladen --help`.
+
 **Speicherbedarf:** höchstens etwa `parallel-dateien × parallel-teile × teilgroesse`
 (Standard 256 MiB). Einzelne Uploads werden gestreamt und brauchen kaum Speicher.
 
-### Exit-Codes
+## Exit-Codes
 
 | Code | Bedeutung |
 |---|---|
@@ -316,18 +680,16 @@ angefangene Multipart-Uploads im Bucket ab und lädt die betroffenen Dateien neu
 | 2 | Bedienfehler (fehlende/ungültige Angabe, falsche Zustandsdatei) |
 | 130 | Abbruch mit Strg+C – erneuter Aufruf setzt fort |
 
-## Entwicklung: Build und Test
+## Zusatzmodule
 
-```bash
-source .venv/bin/activate
-pip install -r requirements-dev.txt && pip install -e .
-ruff format --check .     # Formatierung
-ruff check .              # Linting
-mypy src                  # Typprüfung (strict)
-pytest --cov=s3_uploader  # Tests mit Abdeckung, ohne Netzwerk (S3-Attrappe moto)
-```
+| Datei | Inhalt | Wofür |
+|---|---|---|
+| [`requirements.txt`](requirements.txt) | `boto3` (AWS SDK, Apache-2.0) | Betrieb – immer nötig |
+| [`requirements-dev.txt`](requirements-dev.txt) | zusätzlich `pytest`, `pytest-cov`, `moto`, `ruff`, `mypy` | Entwicklung und Tests |
 
-Paket bauen (Wheel unter `dist/`): `pip install build && python -m build`.
+`pyproject.toml` liest die Laufzeit-Abhängigkeiten direkt aus `requirements.txt`; sie
+stehen also nur an einer Stelle. Paket bauen (Wheel unter `dist/`):
+`pip install build` und danach `python -m build`.
 
 ## Dokumentation
 

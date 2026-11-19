@@ -3,6 +3,15 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Geändert
+- README: Einrichtung und Start vollständig nach Betriebssystem getrennt (Windows/PowerShell,
+  macOS, Linux), je mit Python-Installation, Umgebung, Installation, Prüfung, Start, neuem
+  Fenster, Aktualisieren/Deinstallieren, Offline-Installation, Entwicklung und Hinweisen.
+- README Windows: Freigabe per `Set-ExecutionPolicy -Scope Process` ist regulärer Schritt,
+  weil Windows die Aktivierung standardmäßig sperrt.
+
 ## [0.2.1] – 2026-11-19
 
 ### Behoben
