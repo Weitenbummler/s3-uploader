@@ -309,6 +309,40 @@ mehr begonnen.
 
 ---
 
+## 7a. Zertifikate und `verify`
+
+HTTPS schützt nur, wenn das Programm prüft, *wer* am anderen Ende sitzt. Dazu vergleicht es
+das Zertifikat des Servers mit einer Liste vertrauenswürdiger Zertifizierungsstellen (CA).
+Firmen betreiben oft eine eigene CA; die steht nicht in der öffentlichen Liste, die Python
+mitbringt. Die Folge ist `CERTIFICATE_VERIFY_FAILED`.
+
+boto3 steuert die Prüfung über den Parameter `verify`. `tls_pruefung()` in `client.py`
+übersetzt die Einstellungen:
+
+```python
+if not verbindung.tls_pruefen:
+    return False                          # gar nicht prüfen
+if verbindung.ca_zertifikat is not None:
+    return str(verbindung.ca_zertifikat)  # nur diese CA-Datei gilt
+return None                               # boto3 entscheidet (AWS_CA_BUNDLE oder Standard)
+```
+
+Die Feinheit steckt in der letzten Zeile: Mit `True` würde boto3 die Umgebungsvariable
+`AWS_CA_BUNDLE` übergehen, mit `None` beachtet es sie. Ein Test
+(`test_aws_ca_bundle_wird_beachtet`) sichert genau das ab.
+
+Zweite Lehre: **dauerhafte Fehler nicht wiederholen.** boto3 wiederholt Verbindungsfehler –
+auch einen Zertifikatsfehler, der beim zehnten Versuch genauso auftritt. Der
+Verbindungstest nutzt daher `max_versuche=2`, und `hochladen` prüft die Verbindung vorab,
+statt jede Datei einzeln scheitern zu lassen.
+
+> **Übung 7a:** Warum wäre es gefährlich, das Zertifikat einfach vom Server selbst
+> herunterzuladen und mit `--ca-zertifikat` anzugeben? (Lösung: Ein Angreifer in der
+> Mitte würde dir sein eigenes Zertifikat liefern – du würdest ihm damit vertrauen. Den
+> Fingerabdruck deshalb immer über einen zweiten Weg mit dem Betreiber abgleichen.)
+
+---
+
 ## 8. Testen ohne echten S3-Speicher
 
 Die Tests nutzen **moto**, eine S3-Attrappe, die alle boto3-Aufrufe im Prozess abfängt

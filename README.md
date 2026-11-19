@@ -40,12 +40,12 @@ Alles danach ([Parameter](#parameter-und-umgebungsvariablen), [Optionen](#option
 
 Gemeinsame Voraussetzung: **Python 3.11 oder neuer** und Netzwerkzugang zum S3-Endpunkt.
 
-**Getestet unter** (Version 0.2.1):
+**Getestet unter** (Version 0.3.0):
 
 | System | Python | Kommandozeile | Geprüft |
 |---|---|---|---|
-| Windows 11 (Build 26300) | 3.15.2 | PowerShell 5.1 | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, Umlaute und Leerzeichen in Pfaden |
-| macOS 27.2.1 | 3.11 | zsh | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung` |
+| Windows 11 (Build 26300) | 3.15.2 | PowerShell 5.1 | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, eigene Zertifizierungsstelle (`--ca-zertifikat`, `S3_CA_ZERTIFIKAT`), PEM-Export aus dem Windows-Zertifikatspeicher, Umlaute und Leerzeichen in Pfaden |
+| macOS 27.2.1 | 3.11 | zsh | Installation nach Anleitung, alle Tests, Verbindungstest, Hochladen, Fortsetzen, Strg+C, `--ohne-teilung`, eigene Zertifizierungsstelle (`--ca-zertifikat`, `S3_CA_ZERTIFIKAT`, `AWS_CA_BUNDLE`), PEM-Export aus dem Schlüsselbund |
 | Linux | – | – | **noch nicht geprüft** (nur statische Typprüfung für Linux) |
 
 ---
@@ -169,6 +169,7 @@ s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv `
 ```
 
 Nach einem Abbruch denselben Befehl noch einmal ausführen – der Lauf wird fortgesetzt.
+Meldet der Test ein selbst signiertes Zertifikat: siehe [W12](#w12-eigenes-oder-selbst-signiertes-zertifikat-des-speichers).
 
 ### W7. In einem neuen PowerShell-Fenster
 
@@ -274,6 +275,48 @@ Für den reinen Betrieb (W4) ist 3.15 kein Problem.
 - Pfade über 260 Zeichen brauchen die Windows-Einstellung „Lange Pfade aktivieren“
   (`LongPathsEnabled`).
 
+
+### W12. Eigenes oder selbst signiertes Zertifikat des Speichers
+
+Meldet der Verbindungstest „Zertifikat des Endpunkts ist selbst signiert oder von einer
+eigenen Zertifizierungsstelle“ (technisch: `CERTIFICATE_VERIFY_FAILED … self-signed
+certificate`), braucht s3-uploader das Zertifikat dieser Zertifizierungsstelle als Datei.
+Python nutzt den Windows-Zertifikatspeicher nicht – auch wenn das Firmenzertifikat dort
+installiert ist und der Browser die Seite akzeptiert.
+
+1. **Datei besorgen.** Am besten vom Betreiber des Speichers: das Zertifikat der
+   Zertifizierungsstelle im PEM-Format (Textdatei, beginnt mit
+   `-----BEGIN CERTIFICATE-----`; Endung `.pem`, `.crt` oder `.cer`).
+
+   Ist das Zertifikat bereits in Windows installiert (typisch auf Firmenrechnern), lässt es
+   sich exportieren – grafisch: `certmgr.msc` starten → „Vertrauenswürdige
+   Stammzertifizierungsstellen“ → „Zertifikate“ → Zertifikat der Firma → Rechtsklick
+   „Alle Aufgaben“ → „Exportieren“ → Format **„Base-64-codiert X.509 (.CER)“**. Oder in
+   PowerShell (`Firma` durch einen Teil des Zertifikatnamens ersetzen):
+
+```powershell
+$c = Get-ChildItem Cert:\CurrentUser\Root, Cert:\LocalMachine\Root | Where-Object Subject -like "*Firma*" | Select-Object -First 1
+```
+
+```powershell
+"-----BEGIN CERTIFICATE-----`n" + [Convert]::ToBase64String($c.RawData, "InsertLineBreaks") + "`n-----END CERTIFICATE-----" | Set-Content D:\Zertifikate\firma-ca.pem -Encoding ascii
+```
+
+2. **Angeben** – als Parameter oder für das ganze Fenster:
+
+```powershell
+s3-uploader test … --ca-zertifikat D:\Zertifikate\firma-ca.pem
+```
+
+```powershell
+$env:S3_CA_ZERTIFIKAT = 'D:\Zertifikate\firma-ca.pem'
+```
+
+Hinweise: Das binäre Format „DER-codiert“ funktioniert nicht, nur Base-64/PEM. Gibt es eine
+Zwischenzertifizierungsstelle, beide Zertifikate in eine Datei untereinander kopieren. Ein
+Zertifikat nicht einfach vom Server selbst übernehmen, ohne den Fingerabdruck mit dem
+Betreiber abzugleichen – sonst prüft die Verschlüsselung nichts mehr.
+
 ---
 
 ## macOS
@@ -375,6 +418,7 @@ s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv \
 ```
 
 Nach einem Abbruch denselben Befehl noch einmal ausführen – der Lauf wird fortgesetzt.
+Meldet der Test ein selbst signiertes Zertifikat: siehe [M12](#m12-eigenes-oder-selbst-signiertes-zertifikat-des-speichers).
 
 ### M7. In einem neuen Terminalfenster
 
@@ -430,6 +474,41 @@ ruff format --check . && ruff check . && mypy src && pytest --cov=s3_uploader
   Festplattenvollzugriff).
 - Finder-Hilfsdateien wie `.DS_Store` lassen sich mit `--ausschliessen '*.DS_Store'`
   auslassen.
+
+
+### M12. Eigenes oder selbst signiertes Zertifikat des Speichers
+
+Meldet der Verbindungstest „Zertifikat des Endpunkts ist selbst signiert oder von einer
+eigenen Zertifizierungsstelle“ (technisch: `CERTIFICATE_VERIFY_FAILED`), braucht
+s3-uploader das Zertifikat dieser Zertifizierungsstelle als Datei. Python nutzt den
+macOS-Schlüsselbund nicht – auch wenn Safari die Seite akzeptiert.
+
+1. **Datei besorgen.** Am besten vom Betreiber des Speichers: das Zertifikat der
+   Zertifizierungsstelle im PEM-Format (Textdatei, beginnt mit
+   `-----BEGIN CERTIFICATE-----`).
+
+   Ist es bereits im Schlüsselbund (typisch auf Firmen-Macs), exportieren – grafisch:
+   „Schlüsselbundverwaltung“ → Zertifikat auswählen → „Ablage“ → „Objekte exportieren …“ →
+   Format **„Privacy Enhanced Mail (.pem)“**. Oder im Terminal (`Firma` durch einen Teil des
+   Zertifikatnamens ersetzen; Firmenzertifikate liegen meist im System-Schlüsselbund):
+
+```bash
+security find-certificate -c "Firma" -p /Library/Keychains/System.keychain > ~/firma-ca.pem
+```
+
+2. **Angeben** – als Parameter oder für das ganze Fenster:
+
+```bash
+s3-uploader test … --ca-zertifikat ~/firma-ca.pem
+```
+
+```bash
+export S3_CA_ZERTIFIKAT=~/firma-ca.pem
+```
+
+Hinweise: Gibt es eine Zwischenzertifizierungsstelle, beide Zertifikate in eine Datei
+untereinander kopieren. Ein Zertifikat nicht einfach vom Server selbst übernehmen, ohne den
+Fingerabdruck mit dem Betreiber abzugleichen.
 
 ---
 
@@ -528,6 +607,7 @@ s3-uploader hochladen --endpunkt https://s3.example.org --bucket archiv \
 ```
 
 Nach einem Abbruch denselben Befehl noch einmal ausführen – der Lauf wird fortgesetzt.
+Meldet der Test ein selbst signiertes Zertifikat: siehe [L12](#l12-eigenes-oder-selbst-signiertes-zertifikat-des-speichers).
 
 ### L7. In einem neuen Terminal
 
@@ -579,6 +659,37 @@ ruff format --check . && ruff check . && mypy src && pytest --cov=s3_uploader
   nur für den Benutzer lesbaren Datei laden (`chmod 600`), z. B.
   `EnvironmentFile=/etc/s3-uploader/zugang.env` mit `S3_SECRET_KEY=…`.
 
+
+### L12. Eigenes oder selbst signiertes Zertifikat des Speichers
+
+Meldet der Verbindungstest „Zertifikat des Endpunkts ist selbst signiert oder von einer
+eigenen Zertifizierungsstelle“ (technisch: `CERTIFICATE_VERIFY_FAILED`), braucht
+s3-uploader das Zertifikat dieser Zertifizierungsstelle als Datei.
+
+1. **Datei besorgen** – vom Betreiber des Speichers, im PEM-Format (Textdatei, beginnt mit
+   `-----BEGIN CERTIFICATE-----`).
+
+2. **Angeben** – als Parameter oder für die ganze Sitzung:
+
+```bash
+s3-uploader test … --ca-zertifikat /etc/s3-uploader/firma-ca.pem
+```
+
+```bash
+export S3_CA_ZERTIFIKAT=/etc/s3-uploader/firma-ca.pem
+```
+
+Ist die Firmen-Zertifizierungsstelle systemweit installiert, kann statt der einzelnen
+Datei der Zertifikatsspeicher des Systems angegeben werden (enthält dann öffentliche und
+Firmen-Zertifizierungsstellen): Debian/Ubuntu `/etc/ssl/certs/ca-certificates.crt`,
+Fedora/RHEL `/etc/pki/tls/certs/ca-bundle.crt`. Systemweit installieren (Administrator):
+Debian/Ubuntu Datei mit Endung `.crt` nach `/usr/local/share/ca-certificates/` kopieren und
+`sudo update-ca-certificates`; Fedora/RHEL nach `/etc/pki/ca-trust/source/anchors/` und
+`sudo update-ca-trust`.
+
+Ein Zertifikat nicht einfach vom Server selbst übernehmen, ohne den Fingerabdruck mit dem
+Betreiber abzugleichen.
+
 ---
 
 ## Parameter und Umgebungsvariablen
@@ -593,6 +704,8 @@ Für alle Systeme gleich. Alle Angaben gehen als Parameter **oder** als Umgebung
 | `--access-key` | `S3_ACCESS_KEY` | Access Key |
 | `--passwort` / `--secret-key` | `S3_SECRET_KEY` | Secret Key; fehlt er, wird verdeckt gefragt |
 | `--region` | `S3_REGION` | Region für die Signatur (Standard `us-east-1`) |
+| `--ca-zertifikat DATEI` | `S3_CA_ZERTIFIKAT` | PEM-Datei der Zertifizierungsstelle bei eigenen/selbst signierten Zertifikaten (Abschnitt W12, M12, L12) |
+| `--ohne-tls-pruefung` | – | Zertifikat gar nicht prüfen – nur für Testsysteme |
 
 Umgebungsvariable setzen: Windows `$env:NAME = 'wert'`, macOS/Linux `export NAME='wert'`.
 
@@ -600,6 +713,19 @@ Umgebungsvariable setzen: Windows `$env:NAME = 'wert'`, macOS/Linux `export NAME
 > Prozesslisting und im Shell-Verlauf sichtbar. Das Passwort besser per Umgebungsvariable
 > oder verdeckter Eingabe übergeben. Zugangsdaten werden nie in die Zustandsdatei oder ins
 > Protokoll geschrieben.
+
+## Zertifikate (TLS)
+
+Ohne weitere Angabe prüft s3-uploader das Zertifikat des Endpunkts gegen die üblichen
+öffentlichen Zertifizierungsstellen. Ist die Standard-Umgebungsvariable `AWS_CA_BUNDLE`
+gesetzt, gilt stattdessen die Datei daraus. Mit `--ca-zertifikat` gelten **nur** die
+Zertifizierungsstellen aus der angegebenen Datei. `--ca-zertifikat` und
+`--ohne-tls-pruefung` schließen sich aus.
+
+Vor jedem Upload prüft `hochladen` die Verbindung kurz vorab (Anmeldung, Bucket, Leserecht).
+Schlägt das fehl – etwa wegen eines unbekannten Zertifikats –, bricht der Lauf sofort mit
+Hinweis ab, statt jede Datei einzeln scheitern zu lassen. Verbindungstest und Vorabprüfung
+wiederholen Anfragen nur einmal und melden Fehler deshalb nach Sekunden.
 
 ## Was die Befehle ausgeben
 
@@ -671,7 +797,6 @@ angefangene Multipart-Uploads im Bucket ab und lädt die betroffenen Dateien neu
 | `--probelauf` | – | Nur Übersicht, nichts übertragen |
 | `--still` | – | Keine Fortschrittsanzeige |
 | `--adressierung` | `path` | `virtual` für AWS-Buckets mit DNS-Namen |
-| `--ohne-tls-pruefung` | – | Zertifikat nicht prüfen (nur Testsysteme) |
 | `-v`, `-vv` | – | Mehr Meldungen |
 
 Alle Optionen mit Erklärung: `s3-uploader hochladen --help`.

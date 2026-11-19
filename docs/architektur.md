@@ -57,6 +57,7 @@ classDiagram
         +str region
         +str adressierung
         +bool tls_pruefen
+        +Path ca_zertifikat
     }
 
     class UploadEinstellungen {
@@ -201,7 +202,12 @@ sequenceDiagram
     CLI->>Suche: finde_dateien(quelle, prefix)
     Suche-->>CLI: Liste von Datei
     CLI->>Z: pruefe_kontext()
-    CLI->>U: plane() / lade_hoch()
+    CLI->>U: plane()
+    CLI->>S3: Vorabprüfung HeadBucket, ListObjectsV2 (2 Versuche)
+    alt Vorabprüfung fehlgeschlagen
+        CLI-->>Benutzer: Hinweis (z. B. --ca-zertifikat), Exit 1
+    end
+    CLI->>U: lade_hoch()
 
     loop je Datei (parallel_dateien Threads)
         U->>Z: ist_erledigt(datei)?
@@ -293,4 +299,6 @@ erDiagram
 | Einzelne Uploads gestreamt | Ohne Teilung sind Dateien bis 5 GiB möglich; sie sollen nicht vollständig im Speicher liegen |
 | Warten mit Zeitgrenze statt `as_completed` | Unter Windows unterbricht Strg+C ein Warten ohne Zeitgrenze nicht; mit 0,5 s Zeitgrenze reagiert der Abbruch sofort |
 | Quellpfad mit `os.path.normcase` vereinheitlicht | Unter Windows sind `D:\Daten` und `d:/daten` derselbe Ordner und müssen dieselbe Zustandsdatei finden |
+| `verify=None` statt `True` an boto3 | Nur so beachtet boto3 die Umgebungsvariable `AWS_CA_BUNDLE`; `--ca-zertifikat` übergibt den Pfad, `--ohne-tls-pruefung` `False` |
+| Vorabprüfung vor dem Upload | Dauerhafte Fehler (Zertifikat, Passwort, Bucket) betreffen jede Datei; mit wenigen Versuchen kommt die Meldung nach Sekunden statt nach vielen Wiederholungen je Datei |
 | Threads statt asyncio | Ein-/Ausgabe-lastig, boto3 ist synchron; Threads sind hier einfach und ausreichend |

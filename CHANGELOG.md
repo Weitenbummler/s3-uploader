@@ -3,7 +3,20 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unveröffentlicht]
+## [0.3.0] – 2026-11-19
+
+### Hinzugefügt
+- Option `--ca-zertifikat DATEI` (Umgebungsvariable `S3_CA_ZERTIFIKAT`) für selbst signierte
+  oder firmeneigene Zertifikate; README-Abschnitte W12, M12, L12 zum Besorgen und Exportieren
+  der Datei je Betriebssystem.
+- Verständliche Hinweise bei Zertifikatsfehlern (selbst signiert, abgelaufen, falscher Name).
+- `hochladen` prüft die Verbindung vorab und bricht bei dauerhaften Fehlern sofort ab.
+
+### Behoben
+- Die Standard-Umgebungsvariable `AWS_CA_BUNDLE` wurde übergangen.
+- Verbindungstest meldete Zertifikats- und Verbindungsfehler erst nach rund 30 s
+  (10 Wiederholungen); jetzt nach Sekunden.
+
 
 ### Geändert
 - README: Einrichtung und Start vollständig nach Betriebssystem getrennt (Windows/PowerShell,
