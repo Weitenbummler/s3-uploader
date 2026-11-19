@@ -321,10 +321,10 @@ boto3 steuert die Prüfung über den Parameter `verify`. `tls_pruefung()` in `cl
 
 ```python
 if not verbindung.tls_pruefen:
-    return False                          # gar nicht prüfen
+    return False  # gar nicht prüfen
 if verbindung.ca_zertifikat is not None:
     return str(verbindung.ca_zertifikat)  # nur diese CA-Datei gilt
-return None                               # boto3 entscheidet (AWS_CA_BUNDLE oder Standard)
+return None  # boto3 entscheidet (AWS_CA_BUNDLE oder Standard)
 ```
 
 Die Feinheit steckt in der letzten Zeile: Mit `True` würde boto3 die Umgebungsvariable
