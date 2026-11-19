@@ -40,7 +40,7 @@ from s3_uploader.konfiguration import (
 from s3_uploader.planung import pruefe_schwelle
 from s3_uploader.terminal import bereite_konsole_vor
 from s3_uploader.uploader import Uploader
-from s3_uploader.verbindungstest import teste_verbindung
+from s3_uploader.verbindungstest import Stufe, teste_verbindung, zusammenfassung
 from s3_uploader.zustand import Zustand
 
 EXIT_OK = 0
@@ -269,10 +269,9 @@ def befehl_test(args: argparse.Namespace) -> int:
         args.schreibtest,
     )
     for pruefung in ergebnisse:
-        print(f"  [{'OK  ' if pruefung.ok else 'FEHL'}] {pruefung.name}: {pruefung.hinweis}")
-    erfolgreich = all(p.ok for p in ergebnisse)
-    print("Verbindungstest erfolgreich." if erfolgreich else "Verbindungstest fehlgeschlagen.")
-    return EXIT_OK if erfolgreich else EXIT_FEHLER
+        print(f"  [{pruefung.stufe.value}] {pruefung.name}: {pruefung.hinweis}")
+    print(zusammenfassung(ergebnisse))
+    return EXIT_OK if all(p.ok for p in ergebnisse) else EXIT_FEHLER
 
 
 def befehl_hochladen(args: argparse.Namespace) -> int:
@@ -346,6 +345,11 @@ def befehl_hochladen(args: argparse.Namespace) -> int:
         if fehlschlag is not None:
             print(f"Abbruch vor dem Upload – {fehlschlag.name}: {fehlschlag.hinweis}")
             return EXIT_FEHLER
+        # Hinweise (z. B. fehlendes Leserecht) stoppen den Lauf nicht: Viele Ablagen
+        # erlauben einem Upload-Konto nur das Schreiben.
+        for pruefung in vorab:
+            if pruefung.stufe is Stufe.HINWEIS:
+                print(f"Hinweis – {pruefung.name}: {pruefung.hinweis}", file=sys.stderr)
 
         beginn = time.monotonic()
         if args.still:

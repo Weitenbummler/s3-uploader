@@ -128,4 +128,33 @@ def test_hochladen_bricht_vor_dem_upload_ab_wenn_bucket_fehlt(
     ]
     assert main(argumente) == EXIT_FEHLER
     ausgabe = capsys.readouterr().out
-    assert "Abbruch vor dem Upload" in ausgabe and "Bucket existiert nicht" in ausgabe
+    assert "Abbruch vor dem Upload" in ausgabe and "existiert nicht" in ausgabe
+
+
+def test_hinweise_der_vorabpruefung_stoppen_den_upload_nicht(
+    s3: Any,
+    quelle: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from s3_uploader import cli
+    from s3_uploader.verbindungstest import Pruefung, Stufe
+
+    monkeypatch.setattr(
+        cli,
+        "teste_verbindung",
+        lambda *_a, **_k: [Pruefung("Leserecht im Präfix", Stufe.HINWEIS, "fehlt s3:ListBucket")],
+    )
+    argumente = [
+        "hochladen",
+        *_basis(tmp_path),
+        "--quelle",
+        str(quelle),
+        "--zustand",
+        str(tmp_path / "z.sqlite"),
+        "--still",
+    ]
+    assert main(argumente) == EXIT_OK
+    assert "Hinweis – Leserecht im Präfix" in capsys.readouterr().err
+    assert lies_objekt(s3, "cli/a.txt") == b"Hallo"
