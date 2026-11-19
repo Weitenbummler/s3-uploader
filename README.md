@@ -40,7 +40,7 @@ Alles danach ([Parameter](#parameter-und-umgebungsvariablen), [Optionen](#option
 
 Gemeinsame Voraussetzung: **Python 3.11 oder neuer** und Netzwerkzugang zum S3-Endpunkt.
 
-**Getestet unter** (Version 0.3.1):
+**Getestet unter** (Version 0.4.0):
 
 | System | Python | Kommandozeile | Geprüft |
 |---|---|---|---|
@@ -778,9 +778,10 @@ gesetzt, gilt stattdessen die Datei daraus. Mit `--ca-zertifikat` gelten **nur**
 Zertifizierungsstellen aus der angegebenen Datei. `--ca-zertifikat` und
 `--ohne-tls-pruefung` schließen sich aus.
 
-Vor jedem Upload prüft `hochladen` die Verbindung kurz vorab (Anmeldung, Bucket, Leserecht).
-Schlägt das fehl – etwa wegen eines unbekannten Zertifikats –, bricht der Lauf sofort mit
-Hinweis ab, statt jede Datei einzeln scheitern zu lassen. Verbindungstest und Vorabprüfung
+Vor jedem Upload prüft `hochladen` die Verbindung kurz vorab wie der Verbindungstest (ohne
+Testobjekt). Bei einem Fehler – etwa unbekanntes Zertifikat, falsches Passwort, fehlender
+Bucket – bricht der Lauf sofort mit der Ursache ab, statt jede Datei einzeln scheitern zu
+lassen. Hinweise wie ein fehlendes Leserecht werden angezeigt, der Upload läuft weiter. Verbindungstest und Vorabprüfung
 wiederholen Anfragen nur einmal und melden Fehler deshalb nach Sekunden.
 
 ## Was die Befehle ausgeben
@@ -789,12 +790,57 @@ Verbindungstest:
 
 ```text
 Teste https://s3.example.org – Bucket 'archiv', Präfix 'backup/2026/'
-  [OK  ] Anmeldung und Bucket: Bucket 'archiv' erreichbar
-  [OK  ] Leserecht: Präfix ist leer
+  [OK  ] Verbindung und Zertifikat: Speicher antwortet, Zertifikat gültig
+  [OK  ] Uhrzeit: Abweichung zur Uhr des Speichers: +1 s
+  [OK  ] Zugangsdaten: Access Key und Passwort werden akzeptiert
+  [OK  ] Bucket und Leserecht: Bucket 'archiv' vorhanden, Präfix ist leer
   [OK  ] Schreibrecht: Testobjekt 'backup/2026/.s3-uploader-verbindungstest-…' angelegt
   [OK  ] Löschrecht: Testobjekt wieder entfernt
 Verbindungstest erfolgreich.
 ```
+
+`[FEHL]` verhindert das Hochladen, `[HINW]` ist ein Hinweis (z. B. fehlendes Leserecht), das
+Hochladen funktioniert dann trotzdem.
+
+## Verbindungstest: Ursachen eingrenzen
+
+Ein S3-Speicher antwortet auf viele Probleme nur mit „403 Zugriff verweigert“. Der
+Verbindungstest prüft deshalb in der Reihenfolge, in der auch der Speicher prüft, und nennt
+den ersten Schritt, der scheitert:
+
+| Schritt | Meldung | Ursache und Abhilfe |
+|---|---|---|
+| Verbindung und Zertifikat | Endpunkt nicht erreichbar | URL, Port, Netzwerk, Proxy, Firewall |
+| Verbindung und Zertifikat | Zertifikat … selbst signiert | `--ca-zertifikat` (Abschnitt W12, M12, L12) |
+| Uhrzeit | Abweichung … Uhr korrigieren | Rechneruhr weicht mehr als 15 Minuten ab – automatische Zeitsynchronisation einschalten |
+| Access Key | Access Key ist dem Speicher unbekannt | Schreibweise prüfen; Schlüssel gelöscht oder deaktiviert? |
+| Passwort (Secret Key) | Access Key bekannt, Passwort passt nicht | Secret Key vollständig und ohne Leerzeichen angeben |
+| Region | Region passt nicht | Wert aus der Meldung mit `--region` angeben |
+| Bucket | Bucket existiert nicht | Bucket-Namen prüfen |
+| Leserecht im Präfix | `[HINW]` Auflisten nicht erlaubt | Zugangsdaten sind **richtig**; es fehlt nur das Recht zum Auflisten. Hochladen kann trotzdem klappen – mit `--schreibtest` prüfen |
+| Schreibrecht | Schreiben … nicht erlaubt | Präfix prüfen oder Schreibrecht anfordern |
+| Löschrecht | `[HINW]` Testobjekt bleibt liegen | Für das Hochladen nicht nötig |
+
+Wichtig für die Fehlersuche: Meldet der Test „Leserecht“ oder „Schreibrecht“, sind Access
+Key und Passwort nachweislich richtig – S3 prüft Rechte erst nach erfolgreicher Anmeldung.
+Das Problem liegt dann bei den Berechtigungen des Kontos, nicht bei den Zugangsdaten.
+
+Liefert ein Speicher nur „403“ ohne genauen Fehlercode, sagt der Test das ehrlich („ohne
+genaue Begründung“); dann hilft nur der Betreiber mit seinem Protokoll weiter.
+
+### Benötigte Rechte
+
+Für den Betreiber des Speichers – welche Rechte das Konto für den Bucket bzw. das Präfix
+braucht (Namen nach AWS-Richtlinien; S3-kompatible Speicher verwenden meist dieselben):
+
+| Recht | Wofür | Ohne dieses Recht |
+|---|---|---|
+| `s3:PutObject` | Hochladen (auch die Teile großer Dateien) | kein Upload möglich |
+| `s3:AbortMultipartUpload` | Aufräumen abgebrochener Teil-Uploads | Reste bleiben im Bucket |
+| `s3:ListMultipartUploadParts` | Fortsetzen großer Dateien nach Abbruch | große Dateien beginnen von vorn |
+| `s3:ListBucket` | Verbindungstest „Leserecht“, Prüfung des Bucket | nur Hinweis, Upload geht trotzdem |
+| `s3:GetObject` | nur für `--pruefe-ziel` | `--pruefe-ziel` scheitert |
+| `s3:DeleteObject` | nur für `--schreibtest` (Testobjekt löschen) | Testobjekt bleibt liegen |
 
 Hochladen (aus `<quelle>/projekt/a.pdf` wird das Objekt `backup/2026/projekt/a.pdf`):
 

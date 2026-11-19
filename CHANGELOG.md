@@ -3,6 +3,19 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [0.4.0] – 2026-11-19
+
+### Geändert
+- Verbindungstest grenzt die Ursache ein: Verbindung und Zertifikat, Uhrzeit (Abweichung zur
+  Uhr des Speichers), Access Key unbekannt, Passwort falsch, Region, Bucket, Lese-, Schreib-
+  und Löschrecht – jeweils mit Abhilfe. Ergebnis je Schritt `OK`, `HINW` oder `FEHL`.
+- Fehlendes Leserecht ist nur noch ein Hinweis; Vorabprüfung von `hochladen` lässt den Upload
+  dann weiterlaufen (Konten mit reinem Schreibrecht werden unterstützt).
+
+### Hinzugefügt
+- README: Tabelle „Verbindungstest: Ursachen eingrenzen“ und „Benötigte Rechte“.
+- Tests mit echter Signatur- und Rechteprüfung (moto IAM).
+
 ## [0.3.1] – 2026-11-19
 
 ### Hinzugefügt

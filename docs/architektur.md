@@ -203,8 +203,8 @@ sequenceDiagram
     Suche-->>CLI: Liste von Datei
     CLI->>Z: pruefe_kontext()
     CLI->>U: plane()
-    CLI->>S3: Vorabprüfung HeadBucket, ListObjectsV2 (2 Versuche)
-    alt Vorabprüfung fehlgeschlagen
+    CLI->>S3: Vorabprüfung ListObjectsV2 (2 Versuche): Verbindung, Uhr, Zugangsdaten, Rechte
+    alt Vorabprüfung mit FEHL
         CLI-->>Benutzer: Hinweis (z. B. --ca-zertifikat), Exit 1
     end
     CLI->>U: lade_hoch()
@@ -301,5 +301,7 @@ erDiagram
 | Quellpfad mit `os.path.normcase` vereinheitlicht | Unter Windows sind `D:\Daten` und `d:/daten` derselbe Ordner und müssen dieselbe Zustandsdatei finden |
 | `verify=None` statt `True` an boto3 | Nur so beachtet boto3 die Umgebungsvariable `AWS_CA_BUNDLE`; `--ca-zertifikat` übergibt den Pfad, `--ohne-tls-pruefung` `False` |
 | CA-Datei beim Start prüfen (`pruefe_ca_datei`) | OpenSSL meldet falsche Formate nur als `PEM lib` oder `NO_CERTIFICATE_OR_CRL_FOUND`; die Prüfung erkennt DER, doppelte Kodierung und UTF-16 und nennt die Abhilfe |
+| Diagnose über `ListObjectsV2` statt `HeadBucket` | Eine HEAD-Antwort hat keinen Inhalt und damit bei 403 keinen Fehlercode; `ListObjectsV2` liefert `InvalidAccessKeyId`, `SignatureDoesNotMatch`, `AccessDenied` usw. und den `Date`-Kopf für den Uhrenvergleich |
+| Fehlendes Leserecht nur Hinweis | Upload-Konten dürfen oft nur schreiben; `AccessDenied` beweist zugleich, dass die Zugangsdaten stimmen |
 | Vorabprüfung vor dem Upload | Dauerhafte Fehler (Zertifikat, Passwort, Bucket) betreffen jede Datei; mit wenigen Versuchen kommt die Meldung nach Sekunden statt nach vielen Wiederholungen je Datei |
 | Threads statt asyncio | Ein-/Ausgabe-lastig, boto3 ist synchron; Threads sind hier einfach und ausreichend |

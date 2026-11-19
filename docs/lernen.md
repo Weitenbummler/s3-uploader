@@ -349,6 +349,33 @@ Kodierung ergibt das Entschlüsseln des Blocks wieder `-----BEGIN`.
 
 ---
 
+## 7b. Fehler eingrenzen statt raten
+
+„403 Forbidden“ kann vieles heißen. `verbindungstest.py` nutzt aus, dass S3 eine Anfrage
+in einer festen Reihenfolge prüft: erst die Signatur (Access Key bekannt? Passwort richtig?
+Uhrzeit passend?), dann die Rechte. Daraus folgt eine nützliche Schlussregel:
+
+> Ein `AccessDenied` beweist, dass Access Key und Passwort stimmen – sonst wäre S3 gar
+> nicht bis zur Rechteprüfung gekommen.
+
+Zwei technische Details:
+
+- `HeadBucket` ist eine HEAD-Anfrage. Deren Antwort hat keinen Inhalt – also auch keinen
+  Fehlercode, nur den Status 403. Der Test fragt deshalb mit `ListObjectsV2` (GET), dessen
+  Fehlerantwort den genauen Code enthält.
+- Jede Antwort, auch eine Fehlerantwort, trägt den HTTP-Kopf `Date` mit der Uhrzeit des
+  Servers. Daraus berechnet der Test die Abweichung der eigenen Uhr.
+
+Getestet wird das mit moto in einer besonderen Betriebsart (`set_initial_no_auth_action_count`),
+in der moto Signaturen und IAM-Rechte wirklich prüft – siehe
+`tests/test_verbindungstest_iam.py`.
+
+> **Übung 7b:** Ein Kollege meldet „403 beim Verbindungstest, Schritt Leserecht“. Liegt es
+> am Passwort? (Lösung: Nein. Das Passwort ist richtig, sonst wäre der Test bei
+> „Passwort (Secret Key)“ stehen geblieben. Es fehlt das Recht `s3:ListBucket`.)
+
+---
+
 ## 8. Testen ohne echten S3-Speicher
 
 Die Tests nutzen **moto**, eine S3-Attrappe, die alle boto3-Aufrufe im Prozess abfängt
