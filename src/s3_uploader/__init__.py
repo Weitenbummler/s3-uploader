@@ -1,6 +1,11 @@
-"""s3-uploader – wiederaufsetzbares Hochladen vieler und großer Dateien in einen S3-Bucket."""
+"""s3-uploader – wiederaufsetzbares Hochladen vieler und großer Dateien in einen S3-Bucket.
+
+Autor: Oliver Tesch. Lizenz: MIT (siehe LICENSE).
+"""
 
 from importlib.metadata import PackageNotFoundError, version
+
+__author__ = "Oliver Tesch"
 
 try:
     # Die Version steht nur in pyproject.toml (PY-V1) und wird hier zur Laufzeit gelesen.

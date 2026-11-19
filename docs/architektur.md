@@ -1,5 +1,7 @@
 # Architektur von s3-uploader
 
+Autor: Oliver Tesch
+
 Die Diagramme sind in Mermaid geschrieben und werden von Gitea direkt dargestellt.
 
 ## Module im Überblick

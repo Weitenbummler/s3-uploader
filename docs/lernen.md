@@ -1,5 +1,7 @@
 # s3-uploader verstehen – eine Lern-Dokumentation
 
+Autor: Oliver Tesch
+
 Diese Anleitung erklärt Schritt für Schritt, wie s3-uploader funktioniert und warum er so
 gebaut ist. Sie richtet sich an Leserinnen und Leser, die Python-Grundlagen kennen
 (Funktionen, Klassen, Module) und S3 sowie die verwendeten Techniken kennenlernen wollen.

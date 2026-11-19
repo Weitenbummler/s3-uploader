@@ -3,6 +3,11 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Geändert
+- Urheber (Oliver Tesch) in README, Paket und Dokumentation genannt.
+
 ## [0.4.0] – 2026-11-19
 
 ### Geändert
