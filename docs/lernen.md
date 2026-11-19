@@ -204,6 +204,52 @@ ein Objekt aus alten und neuen Teilen.
 
 ---
 
+## 5a. Teilung abschalten (`--ohne-teilung`)
+
+Die Teilung ist optional. `UploadEinstellungen.teilung` steuert sie, und eine einzige
+Methode entscheidet:
+
+```python
+def _in_teilen(self, datei: Datei) -> bool:
+    return self._e.teilung and braucht_multipart(datei.groesse, self._e.schwelle)
+```
+
+Ist die Teilung aus, landet jede Datei in `_einfach`. Zwei Dinge werden dort wichtig:
+
+1. **Die 5-GiB-Grenze.** Ein einzelner `PutObject` darf nicht größer sein. Größere Dateien
+   werden mit einer klaren Meldung abgewiesen. `plane()` zählt sie vorab in `zu_gross`,
+   damit die Warnung schon vor dem Start erscheint.
+2. **Speicher und Fortschritt.** Statt `read_bytes()` (lädt die ganze Datei) wird die
+   geöffnete Datei als `Body` übergeben – boto3 liest sie dann stückweise. Die Hülle
+   `_FortschrittsLeser` meldet dabei die gelesenen Bytes an die Anzeige:
+
+```python
+def read(self, anzahl: int = -1) -> bytes:
+    daten = self._datei.read(anzahl)
+    position = self._datei.tell()
+    if position > self._weiteste:
+        self._melde(position - self._weiteste)
+        self._weiteste = position
+    return daten
+```
+
+Warum „weiteste Position“ statt einfach `len(daten)`? Schlägt eine Anfrage fehl, springt
+botocore mit `seek(0)` zurück und sendet erneut. Mit `len(daten)` würden die Bytes dann
+doppelt gezählt und die Anzeige stünde bei über 100 %. Die Methode `__getattr__` reicht
+alle anderen Aufrufe (`seek`, `tell` …) unverändert an die Datei weiter – ein Beispiel für
+das Entwurfsmuster **Dekorierer**.
+
+Wer einen mit Teilung begonnenen Lauf ohne Teilung fortsetzt, hinterließe sonst einen
+halben Multipart-Upload im Bucket. `Zustand.offener_upload()` findet ihn, `_breche_upload_ab`
+räumt ihn auf.
+
+> **Übung 5a:** Lade dasselbe Verzeichnis einmal mit und einmal ohne `--ohne-teilung` in
+> zwei verschiedene Präfixe und vergleiche die ETags der großen Datei mit
+> `aws s3api head-object` oder in der Oberfläche deines Speichers. Woran erkennst du das
+> Multipart-Objekt?
+
+---
+
 ## 6. Fortschritt anzeigen (`fortschritt.py`)
 
 Die Arbeits-Threads melden nur Ereignisse (`bytes_uebertragen`, `datei_hochgeladen` …) an
@@ -313,4 +359,6 @@ pytest --cov=s3_uploader        # mit Abdeckung
    `ClientError`; alle anderen Aufrufe leitet `__getattr__` an den echten Client weiter.
 6. Je eine vollständige Zeile in größerem Abstand, ohne Steuerzeichen.
 7. `INFO: Setze fort: <schluessel> (N von M Teilen vorhanden)`.
+5a. Das Multipart-Objekt hat einen ETag mit Bindestrich und Teilanzahl (`"…-3"`), der
+    einfache Upload in der Regel den reinen MD5-Wert der Datei.
 8. Leere Datei anlegen, `_lauf(...)` aufrufen, `lies_objekt(...) == b""` prüfen.

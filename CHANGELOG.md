@@ -3,13 +3,18 @@
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach
 [Semantic Versioning](https://semver.org/lang/de/).
 
-## [Unveröffentlicht]
+## [0.2.0] – 2026-11-19
 
 ### Hinzugefügt
+- Option `--ohne-teilung`: Teilung großer Dateien abschaltbar; jede Datei als ein
+  `PutObject` (höchstens 5 GiB). Warnung in der Übersicht für zu große Dateien; begonnene
+  Multipart-Uploads werden beim Wechsel aufgeräumt.
 - MIT-Lizenz.
 - Spiegelung nach GitHub (github.com/Weitenbummler/s3-uploader), Hinweis im README.
 
 ### Geändert
+- Einzelne Uploads werden gestreamt statt vollständig in den Speicher geladen; die
+  Fortschrittsanzeige bewegt sich auch während einer einzelnen großen Datei.
 - Klon-Anleitung verweist auf das öffentliche GitHub-Repository statt auf die interne Gitea-Adresse.
 
 ## [0.1.0] – 2026-11-19

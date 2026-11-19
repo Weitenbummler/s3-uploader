@@ -15,7 +15,8 @@ Lizenz: [MIT](LICENSE). Entwickelt nach den (intern gepflegten) python-richtlini
   optional Schreib- und Löschrecht – mit verständlichen Fehlerhinweisen.
 - **Multipart für große Dateien**: Dateien oberhalb der Schwelle (Standard 64 MiB) werden in
   Teile zerlegt. Die Teilgröße wird automatisch so vergrößert, dass die S3-Grenze von
-  10 000 Teilen eingehalten wird (Dateien bis 5 TiB).
+  10 000 Teilen eingehalten wird (Dateien bis 5 TiB). Die Teilung ist optional und lässt sich
+  mit `--ohne-teilung` abschalten.
 - **Parallel**: mehrere Dateien und mehrere Teile je Datei gleichzeitig.
 - **Fortschritt**: laufende Zeile mit Prozent, Dateien, Bytes, Rate und Restzeit.
 - **Wiederaufsetzen**: Der Stand wird je Datei und je Teil in einer SQLite-Zustandsdatei
@@ -190,10 +191,36 @@ laufende Teile werden noch fertig übertragen.
 Wurde die Zustandsdatei gelöscht, übernimmt `--pruefe-ziel` bereits vorhandene Objekte
 gleicher Größe, statt sie erneut zu übertragen.
 
+### Teilung großer Dateien ein- oder ausschalten
+
+Standardmäßig werden Dateien über der Schwelle (`--schwelle`, Standard 64 MiB) in Teile
+zerlegt. Mit `--ohne-teilung` geht jede Datei als ein einziger Upload (`PutObject`):
+
+```bash
+s3-uploader hochladen … --quelle /daten/export --ohne-teilung
+```
+
+| | mit Teilung (Standard) | `--ohne-teilung` |
+|---|---|---|
+| Größte Datei | 5 TiB | 5 GiB (S3-Grenze für einen einzelnen Upload) |
+| Abbruch mitten in einer großen Datei | Fortsetzen ab dem ersten fehlenden Teil | Diese Datei beginnt von vorn |
+| Parallelität innerhalb einer Datei | `--parallel-teile` | keine |
+| Objekt im Bucket | identischer Inhalt; ETag hat die Form `…-<Teilanzahl>` | ETag ist in der Regel der MD5-Wert der Datei |
+| Wann sinnvoll | Normalfall, große Dateien, unsichere Leitungen | Speicher ohne (vollständige) Multipart-Unterstützung, gewünschter MD5-ETag |
+
+Ohne Teilung liest das Programm jede Datei zweimal: einmal für die Prüfsumme, einmal für
+die Übertragung. Der Inhalt wird gestreamt, liegt also nicht vollständig im Speicher, und
+die Fortschrittsanzeige bewegt sich auch während einer einzelnen großen Datei. Dateien über
+5 GiB meldet schon die Übersicht vor dem Start als Warnung; sie schlagen ohne Teilung fehl.
+
+Wird ein mit Teilung begonnener Lauf mit `--ohne-teilung` fortgesetzt, bricht das Programm
+angefangene Multipart-Uploads im Bucket ab und lädt die betroffenen Dateien neu hoch.
+
 ### Weitere Optionen von `hochladen`
 
 | Option | Standard | Bedeutung |
 |---|---|---|
+| `--ohne-teilung` | – | Keine Teilung: jede Datei als ein Upload (max. 5 GiB) |
 | `--schwelle` | `64MiB` | Ab dieser Größe Multipart (5 MiB – 5 GiB) |
 | `--teilgroesse` | `16MiB` | Gewünschte Teilgröße (min. 5 MiB, wächst bei Bedarf) |
 | `--parallel-dateien` | `4` | Gleichzeitig bearbeitete Dateien |
@@ -209,7 +236,7 @@ gleicher Größe, statt sie erneut zu übertragen.
 | `-v`, `-vv` | – | Mehr Meldungen |
 
 **Speicherbedarf:** höchstens etwa `parallel-dateien × parallel-teile × teilgroesse`
-(Standard 256 MiB) plus `parallel-dateien × schwelle` für kleine Dateien.
+(Standard 256 MiB). Einzelne Uploads werden gestreamt und brauchen kaum Speicher.
 
 ### Exit-Codes
 

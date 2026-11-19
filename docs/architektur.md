@@ -65,6 +65,7 @@ classDiagram
         +int teilgroesse
         +int parallel_dateien
         +int parallel_teile
+        +bool teilung
         +bool pruefe_ziel
         +tuple ausschluesse
     }
@@ -105,6 +106,7 @@ classDiagram
         +ist_erledigt(datei) bool
         +multipart_stand(datei) MultipartStand
         +veralteter_upload(datei) str
+        +offener_upload(schluessel) str
         +starte_multipart(datei, upload_id, teilgroesse)
         +teil_erledigt(schluessel, nummer, etag)
         +markiere_erledigt(datei, etag)
@@ -156,6 +158,7 @@ classDiagram
         +int erledigt
         +int einfach
         +int multipart
+        +int zu_gross
     }
 
     class S3UploaderFehler
@@ -201,10 +204,14 @@ sequenceDiagram
         U->>Z: ist_erledigt(datei)?
         alt erledigt und unverändert
             U-->>U: überspringen
-        else klein (≤ Schwelle)
-            U->>S3: PutObject (Content-MD5)
+        else klein (≤ Schwelle) oder --ohne-teilung (≤ 5 GiB)
+            U->>Z: offener_upload(schluessel)?
+            opt alter Multipart vorhanden
+                U->>S3: AbortMultipartUpload
+            end
+            U->>S3: PutObject gestreamt (Content-MD5)
             U->>Z: markiere_erledigt
-        else groß
+        else groß und Teilung an
             U->>Z: multipart_stand(datei)
             alt Stand vorhanden
                 U->>S3: ListParts(UploadId)
@@ -279,4 +286,6 @@ erDiagram
 | Server (`ListParts`) entscheidet beim Fortsetzen | Ein Teil kann übertragen, aber vor dem Speichern im Zustand abgebrochen worden sein |
 | Erkennung von Änderungen über Größe + `mtime_ns` | Prüfsummen über Terabytes vorab zu berechnen wäre zu langsam |
 | `Content-MD5` statt boto3-Standardprüfsummen | Wird von praktisch allen S3-kompatiblen Speichern verstanden |
+| Teilung abschaltbar (`--ohne-teilung`) | Manche S3-kompatible Speicher unterstützen Multipart nur eingeschränkt; einzelne Uploads liefern einen MD5-ETag |
+| Einzelne Uploads gestreamt | Ohne Teilung sind Dateien bis 5 GiB möglich; sie sollen nicht vollständig im Speicher liegen |
 | Threads statt asyncio | Ein-/Ausgabe-lastig, boto3 ist synchron; Threads sind hier einfach und ausreichend |
